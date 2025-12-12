@@ -145,10 +145,15 @@ const MOCK_GIFTS: GiftIdea[] = [
   },
 ]
 
+import { AVAILABLE_MODELS, DEFAULT_MODEL } from "@/lib/ai-models" // Added new import
+
+// ... imports remain same ...
+
 export default function GiftGeniusPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [giftResults, setGiftResults] = useState<GiftIdea[]>([])
   const [usedTagPairs, setUsedTagPairs] = useState<string[][]>([])
+  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL) // Updated state type and default
   const { toast } = useToast()
 
   const [profile, setProfile] = useState<UserProfile>({
@@ -185,10 +190,14 @@ export default function GiftGeniusPage() {
           profile,
           usedTagPairs,
           alreadySuggestedGiftTitles, // Send to API
+          model: selectedModel,
         }),
       })
 
-      if (!response.ok) throw new Error("Erreur de génération")
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.details || errorData.hint || "Erreur de génération")
+      }
 
       const data = await response.json()
 
@@ -209,11 +218,11 @@ export default function GiftGeniusPage() {
           description: `${data.gift_ideas.length} nouvelles idées trouvées.`,
         })
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(error)
       toast({
         title: "Erreur",
-        description: "Impossible de générer des cadeaux pour le moment.",
+        description: error.message || "Impossible de générer des cadeaux pour le moment.",
         variant: "destructive",
       })
     } finally {
@@ -251,13 +260,33 @@ export default function GiftGeniusPage() {
       {/* Header */}
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
-              <Gift className="h-6 w-6 text-primary-foreground" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
+                <Gift className="h-6 w-6 text-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-balance">GiftGenius</h1>
+                <p className="text-sm text-muted-foreground">L'IA qui trouve le cadeau parfait</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-balance">GiftGenius</h1>
-              <p className="text-sm text-muted-foreground">L'IA qui trouve le cadeau parfait</p>
+
+            <div className="flex items-center gap-2">
+              <Label htmlFor="model-select" className="text-sm font-medium hidden sm:block">
+                Modèle IA :
+              </Label>
+              <Select value={selectedModel} onValueChange={setSelectedModel}>
+                <SelectTrigger id="model-select" className="w-[180px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {AVAILABLE_MODELS.map((model) => (
+                    <SelectItem key={model.id} value={model.id}>
+                      {model.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </div>
@@ -378,6 +407,7 @@ export default function GiftGeniusPage() {
                     serieuxFun: profile.serieuxFun,
                     objetExperience: profile.objetExperience,
                   }}
+                  selectedModel={selectedModel}
                 />
               </CardContent>
             </Card>

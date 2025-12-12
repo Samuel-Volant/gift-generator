@@ -1,20 +1,17 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import OpenAI from "openai";
 import { NextResponse } from "next/server";
+import { AVAILABLE_MODELS } from "@/lib/ai-models";
 
 export async function POST(req: Request) {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      console.error("GEMINI_API_KEY is not defined");
-      return NextResponse.json(
-        { error: "GEMINI_API_KEY is missing from server environment" },
-        { status: 500 }
-      );
+    const { currentTags, sliders, ignoredTags, model: selectedModelId } = await req.json();
+
+    // 1. Identify the provider
+    const modelConfig = AVAILABLE_MODELS.find((m) => m.id === selectedModelId);
+    if (!modelConfig) {
+      throw new Error(`Model not found: ${selectedModelId}`);
     }
-
-    const genAI = new GoogleGenerativeAI(apiKey);
-
-    const { currentTags, sliders, ignoredTags } = await req.json();
 
     const prompt = `
       CONTEXTE:
@@ -43,7 +40,7 @@ export async function POST(req: Request) {
       - Bon : "Yoga", "Cuisine", "Jazz", "Poterie", "Astronomie", "Bricolage", "Randonnée".
       
       LOGIQUE D'ASSOCIATION (PENSÉE LATÉRALE) :
-      Analyse les tags actuels (${currentTags}) et les sliders (${JSON.stringify(sliders)}).
+      Analyse les tags actuels (${JSON.stringify(currentTags)}) et les sliders (${JSON.stringify(sliders)}).
       Trouve des "Cousins" : des activités différentes mais qui plaisent au même type de cerveau.
       
       EXEMPLES DE TRANSFORMATION :
@@ -55,25 +52,49 @@ export async function POST(req: Request) {
       {
         "suggested_tags": ["Activité 1", "Activité 2", ...]
       }
+      Retourne uniquement le JSON valide.
     `;
 
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
-      generationConfig: {
-        responseMimeType: "application/json",
-        temperature: 0.4,
-      },
-    });
+    let resultData;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
-    const data = JSON.parse(text);
+    if (modelConfig.provider === "google") {
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+      const model = genAI.getGenerativeModel({
+        model: selectedModelId,
+        generationConfig: { responseMimeType: "application/json" }
+      });
 
-    return NextResponse.json(data);
-  } catch (error) {
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      resultData = JSON.parse(text);
+
+    } else if (modelConfig.provider === "groq") {
+      const groq = new OpenAI({
+        apiKey: process.env.GROQ_API_KEY,
+        baseURL: "https://api.groq.com/openai/v1",
+      });
+
+      const completion = await groq.chat.completions.create({
+        model: selectedModelId,
+        messages: [
+          { role: "system", content: "You are a helpful assistant that outputs JSON." },
+          { role: "user", content: prompt },
+        ],
+        response_format: { type: "json_object" },
+      });
+
+      const text = completion.choices[0].message.content;
+      if (!text) throw new Error("No content from Groq");
+      resultData = JSON.parse(text);
+    } else {
+      throw new Error("Provider not supported");
+    }
+
+    return NextResponse.json(resultData);
+  } catch (error: any) {
     console.error("Error generating tags:", error);
     return NextResponse.json(
-      { error: "Failed to generate tags" },
+      { error: "Failed to generate tags", details: error.message },
       { status: 500 }
     );
   }

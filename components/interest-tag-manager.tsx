@@ -7,6 +7,7 @@ import { X, Plus, Sparkles, Star } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { useToast } from "@/components/ui/use-toast"
 import { cn } from "@/lib/utils"
 import type { Interest, InterestLevel } from "@/types"
 
@@ -21,13 +22,15 @@ interface InterestTagManagerProps {
     serieuxFun: number
     objetExperience: number
   }
+  selectedModel?: string
 }
 
-export function InterestTagManager({ interests, onInterestsChange, defaultSuggestions = [], sliders }: InterestTagManagerProps) {
+export function InterestTagManager({ interests, onInterestsChange, defaultSuggestions = [], sliders, selectedModel }: InterestTagManagerProps) {
   const [inputValue, setInputValue] = useState("")
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([])
   const [ignoredTags, setIgnoredTags] = useState<string[]>([]) // New state for ignored tags
   const [isLoading, setIsLoading] = useState(false)
+  const { toast } = useToast()
 
   const handleAddInterest = (label: string, level: InterestLevel = "casual") => {
     if (!label.trim()) return
@@ -96,18 +99,26 @@ export function InterestTagManager({ interests, onInterestsChange, defaultSugges
           currentTags: interests,
           sliders: sliders,
           ignoredTags: updatedIgnoredTags, // Send to API
+          model: selectedModel,
         }),
       })
 
-      if (!response.ok) throw new Error("Erreur de génération")
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.details || errorData.hint || "Erreur de génération")
+      }
 
       const data = await response.json()
       if (data.suggested_tags) {
         setAiSuggestions(data.suggested_tags)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to generate tags", error)
-      // We could toast here if we imported toast
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible de récupérer les suggestions.",
+        variant: "destructive",
+      })
     } finally {
       setIsLoading(false)
     }
