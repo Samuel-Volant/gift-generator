@@ -18,25 +18,30 @@ export async function POST(req: Request) {
 
     const prompt = `
       CONTEXTE:
-      Tu es un assistant expert en idées cadeaux et profilage psychologique.
+      Tu es un expert en sociologie des loisirs et en profilage psychologique.
       
-      PROFIL UTILISATEUR (Sliders):
-      - Pragmatique vs Sentimental: ${sliders?.pragmatiqueSentimental ?? 50}/100
-      - Routine vs Originalité: ${sliders?.routineOriginalite ?? 50}/100
-      - Calme vs Énergie: ${sliders?.calmeEnergie ?? 50}/100
-      - Sérieux vs Fun: ${sliders?.serieuxFun ?? 50}/100
-      - Objet vs Expérience: ${sliders?.objetExperience ?? 50}/100
-
-      INTÉRÊTS ACTUELS:
-      ${currentTags?.map((t: any) => t.label).join(", ") || "Aucun"}
-
-      TA MISSION:
-      Génère 10 nouveaux tags d'intérêts pertinents basés sur ce profil.
-      Mixe des sous-catégories précises (ex: "Jazz fusion" au lieu de "Musique") et des idées latérales surprenantes mais cohérentes.
+      TON OBJECTIF :
+      L'utilisateur a donné des centres d'intérêts (Tags). Tu dois suggérer 10 NOUVEAUX tags qui sont des **Intérêts Adjacents** (Pensée Latérale).
       
-      FORMAT DE RÉPONSE ATTENDU (JSON):
+      RÈGLES STRICTES :
+      1. **INTERDICTION DE SPÉCIALISER** : Ne donne pas de sous-catégories.
+         - MAUVAIS : "Jeux Vidéo" -> "Retrogaming", "Esport", "Nintendo".
+         - BON : "Jeux Vidéo" -> "Jeux de société", "Escape Game", "Programmation", "Science-Fiction".
+      
+      2. **CHERCHE LE "PONT PSYCHOLOGIQUE"** : Trouve des activités qui font appel aux mêmes zones du cerveau ou au même "Vibe", mais dans un domaine différent.
+         - Ex: Si "Cuisine" (Créativité + Précision) -> Suggère "Parfumerie" ou "Chimie amusante".
+         - Ex: Si "Randonnée" (Nature + Effort) -> Suggère "Photographie animalière" ou "Bivouac".
+
+      3. **UTILISE LES SLIDERS** pour orienter l'adjacence :
+         - Profil : ${JSON.stringify(sliders)}
+         - Si le profil est "Calme", cherche des adjacents relaxants.
+         - Si le profil est "Original", cherche des adjacents de niche/bizarres.
+
+      4. **DIVERSITÉ** : Les 10 tags doivent couvrir des domaines variés (Culture, Sport, Manuel, Tech...).
+
+      FORMAT DE RÉPONSE ATTENDU (JSON) :
       {
-        "suggested_tags": ["tag1", "tag2", ..., "tag10"]
+        "suggested_tags": ["Tag1", "Tag2", ...]
       }
     `;
 
