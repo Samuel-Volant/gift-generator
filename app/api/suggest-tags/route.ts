@@ -14,40 +14,55 @@ export async function POST(req: Request) {
 
     const genAI = new GoogleGenerativeAI(apiKey);
 
-    const { currentTags, sliders, profile } = await req.json();
+    const { currentTags, sliders, ignoredTags } = await req.json();
 
     const prompt = `
       CONTEXTE:
-      Tu es un expert en sociologie des loisirs et en profilage psychologique.
+      Tu es un expert en recommandation de loisirs.
       
-      TON OBJECTIF :
-      L'utilisateur a donné des centres d'intérêts (Tags). Tu dois suggérer 10 NOUVEAUX tags qui sont des **Intérêts Adjacents** (Pensée Latérale).
+      OBJECTIF :
+      Suggère 10 NOUVEAUX tags d'intérêts adjacents (Pensée Latérale).
       
-      RÈGLES STRICTES :
-      1. **INTERDICTION DE SPÉCIALISER** : Ne donne pas de sous-catégories.
-         - MAUVAIS : "Jeux Vidéo" -> "Retrogaming", "Esport", "Nintendo".
-         - BON : "Jeux Vidéo" -> "Jeux de société", "Escape Game", "Programmation", "Science-Fiction".
+      CALIBRAGE PRÉCIS DU NIVEAU DE DÉTAIL (CRUCIAL) :
+      Tu dois viser le "Niveau 2 : L'Activité Concrète".
       
-      2. **CHERCHE LE "PONT PSYCHOLOGIQUE"** : Trouve des activités qui font appel aux mêmes zones du cerveau ou au même "Vibe", mais dans un domaine différent.
-         - Ex: Si "Cuisine" (Créativité + Précision) -> Suggère "Parfumerie" ou "Chimie amusante".
-         - Ex: Si "Randonnée" (Nature + Effort) -> Suggère "Photographie animalière" ou "Bivouac".
+      ❌ NIVEAU 1 (INTERDIT - TROP ABSTRAIT) :
+      Ne donne PAS de concepts flous.
+      - Mauvais : "Aventure", "Création", "Sport", "Culture", "Bien-être", "Apprentissage".
+      
+      ❌ NIVEAU 3 (INTERDIT - TROP NICHE) :
+      Ne donne PAS de sous-catégories spécifiques.
+      - Mauvais : "Yoga Ashtanga", "Cuisine Moléculaire", "Jazz des années 50".
+      
+      ❌ TAGS DÉJÀ PROPOSÉS OU IGNORÉS (STRICTEMENT INTERDIT) :
+      Ne suggère SURTOUT PAS ces tags (ni leurs synonymes exacts), car l'utilisateur les a déjà vus ou refusés :
+      ${JSON.stringify(ignoredTags || [])}
 
-      3. **UTILISE LES SLIDERS** pour orienter l'adjacence :
-         - Profil : ${JSON.stringify(sliders)}
-         - Si le profil est "Calme", cherche des adjacents relaxants.
-         - Si le profil est "Original", cherche des adjacents de niche/bizarres.
+      ✅ NIVEAU 2 (CIBLE - L'ACTIVITÉ CONCRÈTE) :
+      Donne des noms d'activités, de hobbies ou de sujets tangibles.
+      - Bon : "Yoga", "Cuisine", "Jazz", "Poterie", "Astronomie", "Bricolage", "Randonnée".
+      
+      LOGIQUE D'ASSOCIATION (PENSÉE LATÉRALE) :
+      Analyse les tags actuels (${currentTags}) et les sliders (${JSON.stringify(sliders)}).
+      Trouve des "Cousins" : des activités différentes mais qui plaisent au même type de cerveau.
+      
+      EXEMPLES DE TRANSFORMATION :
+      - Si "Jeux Vidéo" -> Suggère "Jeux de Société" (pas "Jeu"), "Programmation" (pas "Tech"), "Cinéma" (pas "Art").
+      - Si "Randonnée" -> Suggère "Escalade", "Jardinage", "Photographie".
+      - Si "Lecture" -> Suggère "Écriture", "Histoire", "Langues étrangères".
 
-      4. **DIVERSITÉ** : Les 10 tags doivent couvrir des domaines variés (Culture, Sport, Manuel, Tech...).
-
-      FORMAT DE RÉPONSE ATTENDU (JSON) :
+      FORMAT DE RÉPONSE (JSON) :
       {
-        "suggested_tags": ["Tag1", "Tag2", ...]
+        "suggested_tags": ["Activité 1", "Activité 2", ...]
       }
     `;
 
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
-      generationConfig: { responseMimeType: "application/json" },
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: 0.4,
+      },
     });
 
     const result = await model.generateContent(prompt);

@@ -18,6 +18,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const profile: UserProfile = body.profile;
     const usedTagPairs: string[][] = body.usedTagPairs || [];
+    const alreadySuggestedGiftTitles: string[] = body.alreadySuggestedGiftTitles || [];
 
     // Construct a description of the profile
     const profileDescription = `
@@ -57,6 +58,12 @@ export async function POST(req: Request) {
       ? `NE PAS UTILISER les paires de tags suivantes (déjà vues): ${JSON.stringify(usedTagPairs)}`
       : "";
 
+    const excludedGiftsDescription = alreadySuggestedGiftTitles.length > 0
+      ? `❌ CADEAUX DÉJÀ PROPOSÉS (STRICTEMENT INTERDIT) :
+         Ne suggère PAS ces cadeaux ni des variantes trop proches :
+         ${JSON.stringify(alreadySuggestedGiftTitles)}`
+      : "";
+
     const prompt = `
       Tu es l'IA GiftGenius, le meilleur expert en idées cadeaux au monde.
       
@@ -68,10 +75,11 @@ export async function POST(req: Request) {
       
       CONTRAINTES STRICTES :
       1. **Matrice d'exclusion :** ${usedPairsDescription}
-      2. **Expertise :** Si un intérêt a le niveau 'expert', NE PROPOSE PAS de matériel d'initiation. Propose du matériel pro, rare, ou des expériences pointues.
-      3. **Intention :** L'idée DOIT respecter l'intention : "${profile.intention}".
-      4. **Cohérence Sliders :** Utilise les sliders pour ajuster le "vibe" du cadeau.
-      5. **Blacklist :** Respecte scrupuleusement les interdits.
+      2. **Diversité :** ${excludedGiftsDescription}
+      3. **Expertise :** Si un intérêt a le niveau 'expert', NE PROPOSE PAS de matériel d'initiation. Propose du matériel pro, rare, ou des expériences pointues.
+      4. **Intention :** L'idée DOIT respecter l'intention : "${profile.intention}".
+      5. **Cohérence Sliders :** Utilise les sliders pour ajuster le "vibe" du cadeau.
+      6. **Blacklist :** Respecte scrupuleusement les interdits.
       
       FORMAT DE RÉPONSE (JSON Strict):
       {

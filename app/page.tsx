@@ -175,12 +175,16 @@ export default function GiftGeniusPage() {
   const handleGenerateGifts = async () => {
     setIsLoading(true)
     try {
+      // Extract titles of already suggested gifts
+      const alreadySuggestedGiftTitles = giftResults.map((g) => g.title)
+
       const response = await fetch("/api/generate-gifts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           profile,
           usedTagPairs,
+          alreadySuggestedGiftTitles, // Send to API
         }),
       })
 

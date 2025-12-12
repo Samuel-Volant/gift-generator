@@ -26,6 +26,7 @@ interface InterestTagManagerProps {
 export function InterestTagManager({ interests, onInterestsChange, defaultSuggestions = [], sliders }: InterestTagManagerProps) {
   const [inputValue, setInputValue] = useState("")
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([])
+  const [ignoredTags, setIgnoredTags] = useState<string[]>([]) // New state for ignored tags
   const [isLoading, setIsLoading] = useState(false)
 
   const handleAddInterest = (label: string, level: InterestLevel = "casual") => {
@@ -79,12 +80,22 @@ export function InterestTagManager({ interests, onInterestsChange, defaultSugges
   const handleInspireMe = async () => {
     setIsLoading(true)
     try {
+      // Calculate tags that were suggested but not selected (ignored)
+      const unselectedSuggestions = aiSuggestions.filter(
+        (suggestion) => !interests.some((interest) => interest.label === suggestion),
+      )
+
+      // Update the ignoredTags list
+      const updatedIgnoredTags = [...ignoredTags, ...unselectedSuggestions]
+      setIgnoredTags(updatedIgnoredTags)
+
       const response = await fetch("/api/suggest-tags", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           currentTags: interests,
           sliders: sliders,
+          ignoredTags: updatedIgnoredTags, // Send to API
         }),
       })
 
