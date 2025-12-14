@@ -8,7 +8,6 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const profile: UserProfile = body.profile;
-    const usedTagPairs: string[][] = body.usedTagPairs || [];
     const alreadySuggestedGiftTitles: string[] = body.alreadySuggestedGiftTitles || [];
     const selectedModelId = body.model || "gemini-2.0-flash-exp";
 
@@ -21,42 +20,51 @@ export async function POST(req: Request) {
 
     // 2. Prepare Data for Prompt
     const interestList = profile.interets.map((i) =>
-      `${i.label} (${i.level === 'expert' ? '⭐⭐ EXPERT/PASSIONNÉ' : 'Découverte'})`
+      `${i.label} (${i.level === 'expert' ? '⭐⭐ EXPERT' : 'Découverte'})`
     ).join(", ");
 
     const contextList = [
-      profile.projets.length > 0 ? `🔥 PROJETS ACTUELS: ${profile.projets.map(p => p.label).join(", ")}` : "",
-      profile.plaintes.length > 0 ? `💢 IRRITANTS/PLAINTES: ${profile.plaintes.map(p => p.label).join(", ")}` : "",
-      profile.marquesTotem.length > 0 ? `🛍️ MARQUES TOTEMS: ${profile.marquesTotem.map(t => t.label).join(", ")}` : "",
-      profile.momentDeVie.length > 0 ? `📍 MOMENT DE VIE: ${profile.momentDeVie.map(m => m.label).join(", ")}` : "",
-      profile.roleGroupe.length > 0 ? `🎭 RÔLE DANS LE GROUPE: ${profile.roleGroupe.map(r => r.label).join(", ")}` : "",
-      profile.profilAcheteur !== "ne-se-prononce-pas" ? `💳 PROFIL ACHETEUR: ${profile.profilAcheteur}` : ""
+      profile.projets.length > 0 ? `🔥 PROJETS: ${profile.projets.map(p => p.label).join(", ")}` : "",
+      profile.plaintes.length > 0 ? `💢 IRRITANTS: ${profile.plaintes.map(p => p.label).join(", ")}` : "",
+      profile.marquesTotem.length > 0 ? `🛍️ MARQUES: ${profile.marquesTotem.map(t => t.label).join(", ")}` : "",
+      profile.momentDeVie.length > 0 ? `📍 VIE: ${profile.momentDeVie.map(m => m.label).join(", ")}` : "",
+      profile.roleGroupe.length > 0 ? `🎭 RÔLE: ${profile.roleGroupe.map(r => r.label).join(", ")}` : "",
+      profile.profilAcheteur !== "ne-se-prononce-pas" ? `💳 STYLE ACHAT: ${profile.profilAcheteur}` : ""
     ].filter(Boolean).join("\n");
 
     const exclusions = alreadySuggestedGiftTitles.length > 0
-      ? `🚫 DÉJÀ PROPOSÉS (NE PAS RÉPÉTER): ${alreadySuggestedGiftTitles.join(", ")}`
+      ? `🚫 EXCLUSION (DÉJÀ PROPOSÉS): ${alreadySuggestedGiftTitles.join(", ")}`
       : "";
 
+    // 3. The New "Archetype-Based" System Prompt
     const systemPrompt = `
-      Tu es un "Curator" de Concept Store expert et un Chasseur de Tendances.
+      Tu es un "Curator" de Concept Store expert.
       
       TON OBJECTIF :
-      Trouver 5 cadeaux originaux, spécifiques et "validés par la communauté".
-      Ne propose PAS ce qu'on trouve au supermarché. Propose ce que les passionnés s'achètent entre eux.
+      Générer 5 idées de cadeaux RADICALEMENT DIFFÉRENTES (objets, moments, goûts...).
+      
+      🚨 RÈGLE D'OR DE DIVERSITÉ (ARCHÉTYPES) 🚨
+      Tu dois IMPÉRATIVEMENT couvrir au moins 4 des 5 archétypes ci-dessous.
+      Il est INTERDIT de proposer 5 objets du même type (ex: pas 5 livres).
 
-      STRATÉGIE DE RECHERCHE (CRUCIAL) :
-      1. **INTERSECTION OBLIGATOIRE** : Chaque idée doit croiser au moins 2 données (ex: Cuisine + Chimie, ou Voyage + Plainte "Mal au dos").
-      2. **L'EFFET "CONNAISSEUR"** : Si un intérêt est marqué "EXPERT", fuis le générique. Cherche l'outil de niche, la marque pointue, l'édition limitée.
-      3. **SIMULATION COMMUNAUTAIRE** : Demande-toi : "Qu'est-ce qui est top-tendance sur le subreddit de ce hobby en ce moment ?"
-      4. **ANTI-ENNUYEUX** : Interdit aux : Cartes cadeaux, Mugs simples, T-shirts à message, Posters génériques, "Coffrets découverte" basiques (sauf si ultra-luxe).
+      LES 5 ARCHÉTYPES :
+      1. 📦 **L'OBJET DURABLE** (Tech, Outil, Déco, Mode, Accessoire).
+      2. 🎟️ **L'EXPÉRIENCE** (Atelier, Sortie, Billet, Voyage, Cours).
+      3. 🍪 **LE CONSOMMABLE** (Food, Boisson, Soin, Kit DIY à usage unique).
+      4. 📚 **LE SAVOIR/MÉDIA** (Livre, Revue, Formation) -> ⚠️ LIMITE : MAX 1 SEUL CADEAU DE CE TYPE.
+      5. 🧘 **LE SERVICE / BIEN-ÊTRE** (Abo App, Service à domicile, Massage).
 
-      FORMAT DU "REASONING" (SANS PHRASES) :
-      L'utilisateur ne veut pas de texte. Il veut voir le "Match" des données.
-      Utilise ce format strict avec des Emojis pour mapper l'origine de l'idée :
+      CRITÈRES DE QUALITÉ :
+      1. **Intersection :** Chaque idée doit croiser au moins 2 données (ex: Cuisine + Chimie).
+      2. **Expertise :** Si "EXPERT", propose du matériel de niche (pas d'initiation).
+      3. **Anti-Ennui :** Pas de mugs, pas de T-shirts génériques.
+
+      FORMAT DU "REASONING" (DATA-MATCHING) :
+      Pas de phrases. Utilise des puces courtes avec Emojis pour montrer le lien logique :
       - "🎨 [Tag A] + 🚀 [Tag B]"
       - "🔥 Pour son projet : [Projet]"
-      - "⭐ Niveau Expert respecté"
-      - "💢 Résout : [Plainte]"
+      - "⭐ Expert : Matériel Pro"
+      - "📦 Format : [Nom de l'archétype]"
 
       OUTPUT JSON ATTENDU :
       {
@@ -65,7 +73,7 @@ export async function POST(req: Request) {
             "emoji": "🧪",
             "title": "Nom Précis du Produit",
             "category": "Catégorie courte",
-            "reasoning": "Liste courte des match points (max 3 lignes)",
+            "reasoning": "Puces de justification (max 3)",
             "price": "€€", 
             "tags_used": ["Tag1", "Tag2"]
           }
@@ -92,17 +100,20 @@ export async function POST(req: Request) {
 
       ${exclusions}
 
-      Trouve 5 pépites maintenant.
+      Génère 5 idées variées maintenant (Respecte les Archétypes !).
     `;
 
     let resultData;
 
-    try { // Inner try/catch for provider specific errors
+    try {
       if (provider === "google") {
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
         const model = genAI.getGenerativeModel({
           model: modelName,
-          generationConfig: { responseMimeType: "application/json" }
+          generationConfig: { 
+            responseMimeType: "application/json",
+            temperature: 0.7, // 0.7 pour un bon équilibre variété/cohérence
+          }
         });
 
         const result = await model.generateContent({
@@ -126,7 +137,7 @@ export async function POST(req: Request) {
             { role: "user", content: userMessage },
           ],
           response_format: { type: "json_object" },
-          temperature: 0.8, // Increased for creativity
+          temperature: 0.7, 
         });
 
         const text = completion.choices[0].message.content;
@@ -137,15 +148,12 @@ export async function POST(req: Request) {
       }
     } catch (providerError: any) {
       console.error(`Provider ${provider} error:`, providerError);
-      throw providerError; // Re-throw to be caught by outer handler
+      throw providerError;
     }
 
-    // Post-process to ensure IDs and compatibility
     const giftsWithIds = (resultData.gift_ideas || []).map((gift: any) => ({
       ...gift,
       id: Math.random().toString(36).substr(2, 9),
-      // Ensure price format matches expected enum if needed, or leave as string
-      // Frontend expects specific emoji/title/reasoning/price keys
     }));
 
     return NextResponse.json({ gift_ideas: giftsWithIds });
@@ -156,7 +164,6 @@ export async function POST(req: Request) {
       {
         error: "Failed to generate gifts",
         details: error.message,
-        hint: error.status === 404 || error.status === 400 ? "Model deprecated or API Key invalid" : undefined
       },
       { status: 500 }
     );
