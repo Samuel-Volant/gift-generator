@@ -1,7 +1,6 @@
 "use client"
 
-import { useState } from "react"
-import { Sparkles, Gift, Loader2 } from "lucide-react"
+import { useState, useEffect } from "react"import { Sparkles, Gift, Loader2 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
@@ -145,16 +144,47 @@ const MOCK_GIFTS: GiftIdea[] = [
   },
 ]
 
-import { AVAILABLE_MODELS, DEFAULT_MODEL } from "@/lib/ai-models" // Added new import
-
-// ... imports remain same ...
+import { FALLBACK_MODELS, DEFAULT_MODEL, type AIModel } from "@/lib/ai-models"
 
 export default function GiftGeniusPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [giftResults, setGiftResults] = useState<GiftIdea[]>([])
   const [usedTagPairs, setUsedTagPairs] = useState<string[][]>([])
-  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL) // Updated state type and default
+  const [availableModels, setAvailableModels] = useState<AIModel[]>(FALLBACK_MODELS)
+  const [isLoadingModels, setIsLoadingModels] = useState(true)
+  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL)
   const { toast } = useToast()
+
+  // Provider correspondant au modèle sélectionné (utile pour les appels API)
+  const selectedProvider = availableModels.find((m) => m.id === selectedModel)?.provider ?? "google"
+
+  // Charge dynamiquement la liste des modèles gratuits disponibles
+  useEffect(() => {
+    let isMounted = true
+
+    fetch("/api/models")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!isMounted) return
+        if (data.models && data.models.length > 0) {
+          setAvailableModels(data.models)
+          // Si le modèle sélectionné n'existe plus dans la nouvelle liste, on bascule sur le premier dispo
+          setSelectedModel((current) =>
+            data.models.some((m: AIModel) => m.id === current) ? current : data.models[0].id,
+          )
+        }
+      })
+      .catch((error) => {
+        console.error("Impossible de charger les modèles disponibles:", error)
+      })
+      .finally(() => {
+        if (isMounted) setIsLoadingModels(false)
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   const [profile, setProfile] = useState<UserProfile>({
     age: 28,
@@ -191,6 +221,7 @@ export default function GiftGeniusPage() {
           usedTagPairs,
           alreadySuggestedGiftTitles, // Send to API
           model: selectedModel,
+          provider: selectedProvider,
         }),
       })
 
@@ -275,12 +306,12 @@ export default function GiftGeniusPage() {
               <Label htmlFor="model-select" className="text-sm font-medium hidden sm:block">
                 Modèle IA :
               </Label>
-              <Select value={selectedModel} onValueChange={setSelectedModel}>
-                <SelectTrigger id="model-select" className="w-[180px]">
-                  <SelectValue />
+              <Select value={selectedModel} onValueChange={setSelectedModel} disabled={isLoadingModels}>
+                <SelectTrigger id="model-select" className="w-[220px]">
+                  <SelectValue placeholder={isLoadingModels ? "Chargement..." : "Choisir un modèle"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {AVAILABLE_MODELS.map((model) => (
+                  {availableModels.map((model) => (
                     <SelectItem key={model.id} value={model.id}>
                       {model.name}
                     </SelectItem>
@@ -408,6 +439,7 @@ export default function GiftGeniusPage() {
                     objetExperience: profile.objetExperience,
                   }}
                   selectedModel={selectedModel}
+                  selectedProvider={selectedProvider}
                 />
               </CardContent>
             </Card>

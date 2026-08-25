@@ -1,17 +1,25 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
-import { AVAILABLE_MODELS } from "@/lib/ai-models";
 
 export async function POST(req: Request) {
   try {
-    const { currentTags, sliders, ignoredTags, model: selectedModelId } = await req.json();
+    const {
+      currentTags,
+      sliders,
+      ignoredTags,
+      model: selectedModelId,
+      provider: selectedProvider,
+    } = await req.json();
 
-    // 1. Identify the provider
-    const modelConfig = AVAILABLE_MODELS.find((m) => m.id === selectedModelId);
-    if (!modelConfig) {
-      throw new Error(`Model not found: ${selectedModelId}`);
+    if (!selectedModelId) {
+      throw new Error("Model not provided");
     }
+
+    const modelConfig = {
+      id: selectedModelId,
+      provider: (selectedProvider === "groq" ? "groq" : "google") as "google" | "groq",
+    };
 
     const prompt = `
       CONTEXTE:

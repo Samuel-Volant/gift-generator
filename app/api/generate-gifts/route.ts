@@ -2,20 +2,16 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
 import { UserProfile } from "@/types";
-import { AVAILABLE_MODELS } from "@/lib/ai-models";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const profile: UserProfile = body.profile;
-    
+
     // On s'assure de bien récupérer la liste des titres déjà suggérés
     const alreadySuggestedGiftTitles: string[] = body.alreadySuggestedGiftTitles || [];
-    const selectedModelId = body.model || "gemini-2.0-flash-exp";
-
-    const modelConfig = AVAILABLE_MODELS.find((m) => m.id === selectedModelId);
-    const provider = modelConfig?.provider || "google";
-    const modelName = modelConfig?.id || "gemini-2.0-flash-exp";
+    const modelName: string = body.model || "gemini-2.0-flash-exp";
+    const provider: "google" | "groq" = body.provider === "groq" ? "groq" : "google";
 
     // Formatage des intérêts et contexte
     const interestList = profile.interets.map((i) =>

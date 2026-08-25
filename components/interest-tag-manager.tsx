@@ -15,7 +15,7 @@ interface InterestTagManagerProps {
   interests: Interest[]
   onInterestsChange: (interests: Interest[]) => void
   defaultSuggestions?: string[]
-  sliders?: { // Added sliders prop
+  sliders?: {
     pragmatiqueSentimental: number
     routineOriginalite: number
     calmeEnergie: number
@@ -23,9 +23,17 @@ interface InterestTagManagerProps {
     objetExperience: number
   }
   selectedModel?: string
+  selectedProvider?: "google" | "groq"
 }
 
-export function InterestTagManager({ interests, onInterestsChange, defaultSuggestions = [], sliders, selectedModel }: InterestTagManagerProps) {
+export function InterestTagManager({
+  interests,
+  onInterestsChange,
+  defaultSuggestions = [],
+  sliders,
+  selectedModel,
+  selectedProvider,
+}: InterestTagManagerProps) {
   const [inputValue, setInputValue] = useState("")
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([])
   const [ignoredTags, setIgnoredTags] = useState<string[]>([]) // New state for ignored tags
@@ -100,6 +108,7 @@ export function InterestTagManager({ interests, onInterestsChange, defaultSugges
           sliders: sliders,
           ignoredTags: updatedIgnoredTags, // Send to API
           model: selectedModel,
+          provider: selectedProvider,
         }),
       })
 
