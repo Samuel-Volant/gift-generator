@@ -12,7 +12,7 @@ import { InterestTagManager } from "@/components/interest-tag-manager"
 import { PsychologySlider } from "@/components/psychology-slider"
 import { GiftCard } from "@/components/gift-card"
 import type { UserProfile, GiftIdea, Tag } from "@/types"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 
 // Mock Data
 const MOCK_GIFTS: GiftIdea[] = [

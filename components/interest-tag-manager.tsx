@@ -7,7 +7,7 @@ import { X, Plus, Sparkles, Star, RotateCcw } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import type { Interest, InterestLevel } from "@/types"
 
