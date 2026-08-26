@@ -1,7 +1,5 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect, useCallback } from "react"
 import { X, Plus, Sparkles, Star, RotateCcw } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -9,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
+import { useTagManager, isDuplicateLabel, generateTagId } from "@/components/tag-manager-base"
 import type { Interest, InterestLevel, Provider } from "@/types"
 
 interface InterestTagManagerProps {
@@ -34,26 +33,44 @@ export function InterestTagManager({
   selectedModel,
   selectedProvider,
 }: InterestTagManagerProps) {
-  const [inputValue, setInputValue] = useState("")
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([])
-  const [ignoredTags, setIgnoredTags] = useState<string[]>([]) // New state for ignored tags
+  const [ignoredTags, setIgnoredTags] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const { toast } = useToast()
 
-  const handleAddInterest = (label: string, level: InterestLevel = "casual") => {
-    if (!label.trim()) return
+  const {
+    inputValue,
+    setInputValue,
+    handleAddTag: baseHandleAddTag,
+    handleRemoveTag: baseHandleRemoveTag,
+    handleSuggestionClick: baseHandleSuggestionClick,
+    handleKeyDown,
+    getAvailableSuggestions,
+  } = useTagManager<Interest>(interests, onInterestsChange, {
+    createTag: (label) => ({
+      id: generateTagId(),
+      label,
+      level: "casual" as InterestLevel,
+    }),
+  })
 
-    if (interests.some((interest) => interest.label.toLowerCase() === label.trim().toLowerCase())) {
+  const handleAddInterest = (label: string, level: InterestLevel = "casual") => {
+    const trimmed = label.trim()
+    if (!trimmed) return
+    if (isDuplicateLabel(interests, trimmed)) {
       setInputValue("")
       return
     }
-
+    // Reuse base for casual to keep single code path, custom for expert
+    if (level === "casual") {
+      baseHandleAddTag(trimmed)
+      return
+    }
     const newInterest: Interest = {
-      id: `${Date.now()}-${Math.random()}`,
-      label: label.trim(),
+      id: generateTagId(),
+      label: trimmed,
       level,
     }
-
     onInterestsChange([...interests, newInterest])
     setInputValue("")
   }
@@ -77,7 +94,7 @@ export function InterestTagManager({
     if (removed) {
       setIgnoredTags((prev) => prev.filter((tag) => tag.toLowerCase() !== removed.label.toLowerCase()))
     }
-    onInterestsChange(interests.filter((interest) => interest.id !== id))
+    baseHandleRemoveTag(id)
   }
 
   const handleResetIgnoredTags = useCallback(() => {
@@ -85,12 +102,10 @@ export function InterestTagManager({
   }, [])
 
   // Si un interet est supprime depuis l'exterieur (parent), nettoyer ignoredTags
-  // pour eviter que la liste grossisse indefiniment et bloque des suggestions.
   useEffect(() => {
     const interestLabels = new Set(interests.map((i) => i.label.toLowerCase()))
     setIgnoredTags((prev) => {
       const filtered = prev.filter((tag) => !interestLabels.has(tag.toLowerCase()))
-      // Deduplicate case-insensitive
       const seen = new Set<string>()
       const deduped: string[] = []
       for (const tag of filtered) {
@@ -100,7 +115,6 @@ export function InterestTagManager({
           deduped.push(tag)
         }
       }
-      // Only update if changed to avoid infinite loops
       if (deduped.length !== prev.length || deduped.some((v, i) => v !== prev[i])) {
         return deduped
       }
@@ -108,27 +122,12 @@ export function InterestTagManager({
     })
   }, [interests])
 
-  const handleSuggestionClick = (suggestion: string) => {
-    if (interests.some((interest) => interest.label === suggestion)) return
-    handleAddInterest(suggestion, "casual")
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.preventDefault()
-      handleAddInterest(inputValue)
-    }
-  }
-
   const handleInspireMe = async () => {
     setIsLoading(true)
     try {
-      // Calculate tags that were suggested but not selected (ignored)
       const unselectedSuggestions = aiSuggestions.filter(
         (suggestion) => !interests.some((interest) => interest.label.toLowerCase() === suggestion.toLowerCase()),
       )
-
-      // Update the ignoredTags list (dedup case-insensitive)
       const seen = new Set(ignoredTags.map((t) => t.toLowerCase()))
       const newTags = unselectedSuggestions.filter((t) => !seen.has(t.toLowerCase()))
       const updatedIgnoredTags = [...ignoredTags, ...newTags]
@@ -140,7 +139,7 @@ export function InterestTagManager({
         body: JSON.stringify({
           currentTags: interests,
           sliders: sliders,
-          ignoredTags: updatedIgnoredTags, // Send to API
+          ignoredTags: updatedIgnoredTags,
           model: selectedModel,
           provider: selectedProvider,
         }),
@@ -168,17 +167,11 @@ export function InterestTagManager({
     }
   }
 
-  const availableDefaultSuggestions = defaultSuggestions.filter(
-    (suggestion) => !interests.some((interest) => interest.label === suggestion),
-  )
-
-  const availableAiSuggestions = aiSuggestions.filter(
-    (suggestion) => !interests.some((interest) => interest.label === suggestion),
-  )
+  const availableDefaultSuggestions = getAvailableSuggestions(defaultSuggestions)
+  const availableAiSuggestions = getAvailableSuggestions(aiSuggestions)
 
   return (
     <div className="space-y-3">
-      {/* Zone Active - Intérêts Sélectionnés */}
       {interests.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {interests.map((interest) => (
@@ -188,7 +181,7 @@ export function InterestTagManager({
                 "px-3 py-1.5 text-sm font-medium flex items-center gap-1.5 cursor-pointer transition-all",
                 interest.level === "casual" && "bg-blue-500 text-white hover:bg-blue-600",
                 interest.level === "expert" &&
-                "bg-gradient-to-r from-amber-400 to-yellow-500 text-white hover:from-amber-500 hover:to-yellow-600",
+                  "bg-gradient-to-r from-amber-400 to-yellow-500 text-white hover:from-amber-500 hover:to-yellow-600",
               )}
               onClick={() => handleToggleLevel(interest.id)}
             >
@@ -208,7 +201,6 @@ export function InterestTagManager({
         </div>
       )}
 
-      {/* Zone d'Input avec Bouton Inspire Me */}
       <div className="flex gap-2">
         <Input
           value={inputValue}
@@ -231,7 +223,6 @@ export function InterestTagManager({
         </Button>
       </div>
 
-      {/* Zone de Suggestions */}
       {(availableDefaultSuggestions.length > 0 || availableAiSuggestions.length > 0) && (
         <div className="space-y-2">
           {availableDefaultSuggestions.length > 0 && (
@@ -241,7 +232,7 @@ export function InterestTagManager({
                   key={suggestion}
                   variant="outline"
                   className="px-3 py-1.5 text-sm cursor-pointer hover:bg-muted transition-colors"
-                  onClick={() => handleSuggestionClick(suggestion)}
+                  onClick={() => baseHandleSuggestionClick(suggestion)}
                 >
                   {suggestion}
                 </Badge>
@@ -256,7 +247,7 @@ export function InterestTagManager({
                   key={suggestion}
                   variant="secondary"
                   className="px-3 py-1.5 text-sm cursor-pointer bg-primary/10 text-primary hover:bg-primary/20 transition-colors border-primary/20"
-                  onClick={() => handleSuggestionClick(suggestion)}
+                  onClick={() => baseHandleSuggestionClick(suggestion)}
                 >
                   ✨ {suggestion}
                 </Badge>
@@ -266,7 +257,6 @@ export function InterestTagManager({
         </div>
       )}
 
-      {/* Actions secondaires */}
       {ignoredTags.length > 0 && (
         <div className="flex items-center gap-2 pt-1">
           <span className="text-xs text-muted-foreground">{ignoredTags.length} suggestion(s) ignoree(s)</span>
@@ -277,7 +267,6 @@ export function InterestTagManager({
         </div>
       )}
 
-      {/* Légende */}
       <div className="flex items-center gap-4 text-xs text-muted-foreground pt-1">
         <div className="flex items-center gap-1.5">
           <div className="w-4 h-4 rounded bg-blue-500" />
