@@ -2,8 +2,8 @@
 
 import type React from "react"
 
-import { useState } from "react"
-import { X, Plus, Sparkles, Star } from "lucide-react"
+import { useState, useEffect, useCallback } from "react"
+import { X, Plus, Sparkles, Star, RotateCcw } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -73,8 +73,40 @@ export function InterestTagManager({
   }
 
   const handleRemoveInterest = (id: string) => {
+    const removed = interests.find((interest) => interest.id === id)
+    if (removed) {
+      setIgnoredTags((prev) => prev.filter((tag) => tag.toLowerCase() !== removed.label.toLowerCase()))
+    }
     onInterestsChange(interests.filter((interest) => interest.id !== id))
   }
+
+  const handleResetIgnoredTags = useCallback(() => {
+    setIgnoredTags([])
+  }, [])
+
+  // Si un interet est supprime depuis l'exterieur (parent), nettoyer ignoredTags
+  // pour eviter que la liste grossisse indefiniment et bloque des suggestions.
+  useEffect(() => {
+    const interestLabels = new Set(interests.map((i) => i.label.toLowerCase()))
+    setIgnoredTags((prev) => {
+      const filtered = prev.filter((tag) => !interestLabels.has(tag.toLowerCase()))
+      // Deduplicate case-insensitive
+      const seen = new Set<string>()
+      const deduped: string[] = []
+      for (const tag of filtered) {
+        const lower = tag.toLowerCase()
+        if (!seen.has(lower)) {
+          seen.add(lower)
+          deduped.push(tag)
+        }
+      }
+      // Only update if changed to avoid infinite loops
+      if (deduped.length !== prev.length || deduped.some((v, i) => v !== prev[i])) {
+        return deduped
+      }
+      return prev
+    })
+  }, [interests])
 
   const handleSuggestionClick = (suggestion: string) => {
     if (interests.some((interest) => interest.label === suggestion)) return
@@ -93,11 +125,13 @@ export function InterestTagManager({
     try {
       // Calculate tags that were suggested but not selected (ignored)
       const unselectedSuggestions = aiSuggestions.filter(
-        (suggestion) => !interests.some((interest) => interest.label === suggestion),
+        (suggestion) => !interests.some((interest) => interest.label.toLowerCase() === suggestion.toLowerCase()),
       )
 
-      // Update the ignoredTags list
-      const updatedIgnoredTags = [...ignoredTags, ...unselectedSuggestions]
+      // Update the ignoredTags list (dedup case-insensitive)
+      const seen = new Set(ignoredTags.map((t) => t.toLowerCase()))
+      const newTags = unselectedSuggestions.filter((t) => !seen.has(t.toLowerCase()))
+      const updatedIgnoredTags = [...ignoredTags, ...newTags]
       setIgnoredTags(updatedIgnoredTags)
 
       const response = await fetch("/api/suggest-tags", {
@@ -121,11 +155,12 @@ export function InterestTagManager({
       if (data.suggested_tags) {
         setAiSuggestions(data.suggested_tags)
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to generate tags", error)
+      const message = error instanceof Error ? error.message : String(error)
       toast({
         title: "Erreur",
-        description: error.message || "Impossible de récupérer les suggestions.",
+        description: message || "Impossible de récupérer les suggestions.",
         variant: "destructive",
       })
     } finally {
@@ -228,6 +263,17 @@ export function InterestTagManager({
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Actions secondaires */}
+      {ignoredTags.length > 0 && (
+        <div className="flex items-center gap-2 pt-1">
+          <span className="text-xs text-muted-foreground">{ignoredTags.length} suggestion(s) ignoree(s)</span>
+          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1" onClick={handleResetIgnoredTags}>
+            <RotateCcw className="h-3 w-3" />
+            Reinitialiser
+          </Button>
         </div>
       )}
 
