@@ -2,16 +2,57 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
 import { UserProfile } from "@/types";
+import { parseJsonSafe } from "@/lib/parse-json";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const profile: UserProfile = body.profile;
 
+    // Validation provider explicite (pas de défaut silencieux)
+    const rawProvider = body.provider;
+    if (rawProvider !== undefined && rawProvider !== "google" && rawProvider !== "groq") {
+      return NextResponse.json(
+        { error: "Provider invalide", details: `Provider "${rawProvider}" non supporte. Valeurs autorisees: google, groq` },
+        { status: 400 }
+      );
+    }
+    const provider: "google" | "groq" = rawProvider === "groq" ? "groq" : "google";
+
     // On s'assure de bien récupérer la liste des titres déjà suggérés
     const alreadySuggestedGiftTitles: string[] = body.alreadySuggestedGiftTitles || [];
     const modelName: string = body.model || "gemini-2.0-flash-exp";
-    const provider: "google" | "groq" = body.provider === "groq" ? "groq" : "google";
+
+    // Validation modelName (regex simple, évite injection)
+    if (typeof modelName !== "string" || modelName.trim().length === 0) {
+      return NextResponse.json({ error: "Model manquant", details: "Le champ 'model' est requis" }, { status: 400 });
+    }
+    if (!/^[A-Za-z0-9._\/:-]+$/.test(modelName)) {
+      return NextResponse.json(
+        { error: "Model invalide", details: `Nom de modele "${modelName}" invalide` },
+        { status: 400 }
+      );
+    }
+
+    // Garde clés API - retour 503 si manquante
+    if (provider === "google" && !process.env.GEMINI_API_KEY) {
+      return NextResponse.json(
+        {
+          error: "GEMINI_API_KEY manquante",
+          hint: "Definissez GEMINI_API_KEY dans .env.local (https://aistudio.google.com/app/apikey)",
+        },
+        { status: 503 }
+      );
+    }
+    if (provider === "groq" && !process.env.GROQ_API_KEY) {
+      return NextResponse.json(
+        {
+          error: "GROQ_API_KEY manquante",
+          hint: "Definissez GROQ_API_KEY dans .env.local (https://console.groq.com/keys)",
+        },
+        { status: 503 }
+      );
+    }
 
     // Formatage des intérêts et contexte
     const interestList = profile.interets.map((i) =>
@@ -67,20 +108,24 @@ export async function POST(req: Request) {
       Génère 5 nouvelles pépites (DIFFÉRENTES de la liste d'exclusion).
     `;
 
-    let resultData;
+    let resultData: unknown;
 
     if (provider === "google") {
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
       const model = genAI.getGenerativeModel({
         model: modelName,
         systemInstruction: systemPrompt,
-        generationConfig: { responseMimeType: "application/json", temperature: 0.8 }
+        generationConfig: { responseMimeType: "application/json", temperature: 0.8 },
       });
 
       const result = await model.generateContent({
-        contents: [{ role: "user", parts: [{ text: userMessage }] }]
+        contents: [{ role: "user", parts: [{ text: userMessage }] }],
       });
-      resultData = JSON.parse(result.response.text());
+      const text = result.response.text();
+      if (!text) {
+        throw new Error("Reponse vide du LLM (Google)");
+      }
+      resultData = parseJsonSafe(text);
 
     } else if (provider === "groq") {
       const groq = new OpenAI({
@@ -97,18 +142,37 @@ export async function POST(req: Request) {
         response_format: { type: "json_object" },
         temperature: 0.8,
       });
-      resultData = JSON.parse(completion.choices[0].message.content || "{}");
+      const text = completion.choices[0]?.message?.content;
+      if (!text) {
+        throw new Error("Reponse vide du LLM (Groq)");
+      }
+      resultData = parseJsonSafe(text);
     }
 
-    const giftsWithIds = (resultData.gift_ideas || []).map((gift: any) => ({
+    if (
+      !resultData ||
+      typeof resultData !== "object" ||
+      !("gift_ideas" in resultData) ||
+      !Array.isArray((resultData as { gift_ideas: unknown }).gift_ideas)
+    ) {
+      throw new Error("Format LLM invalide: 'gift_ideas' manquant ou non-array");
+    }
+
+    const giftsWithIds = (
+      (resultData as { gift_ideas: Record<string, unknown>[] }).gift_ideas
+    ).map((gift) => ({
       ...gift,
-      id: Math.random().toString(36).substr(2, 9),
+      id:
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : Math.random().toString(36).slice(2, 11),
     }));
 
     return NextResponse.json({ gift_ideas: giftsWithIds });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error:", error);
-    return NextResponse.json({ error: "Failed" }, { status: 500 });
+    const message = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: "Failed", details: message }, { status: 500 });
   }
 }
