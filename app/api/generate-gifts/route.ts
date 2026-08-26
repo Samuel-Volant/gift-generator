@@ -18,11 +18,14 @@ export async function POST(req: Request) {
       `${i.label} (${i.level === 'expert' ? '⭐⭐ EXPERT' : 'Découverte'})`
     ).join(", ");
 
+    const blacklistLabels = profile.blacklist.map(t => t.label).join(", ");
+
     const contextList = [
       profile.projets.length > 0 ? `🔥 PROJETS: ${profile.projets.map(p => p.label).join(", ")}` : "",
       profile.plaintes.length > 0 ? `💢 IRRITANTS: ${profile.plaintes.map(p => p.label).join(", ")}` : "",
       profile.marquesTotem.length > 0 ? `🛍️ MARQUES: ${profile.marquesTotem.map(t => t.label).join(", ")}` : "",
       profile.momentDeVie.length > 0 ? `📍 VIE: ${profile.momentDeVie.map(m => m.label).join(", ")}` : "",
+      profile.roleGroupe.length > 0 ? `👥 ROLE GROUPE: ${profile.roleGroupe.map(t => t.label).join(", ")}` : "",
       profile.profilAcheteur !== "ne-se-prononce-pas" ? `💳 STYLE ACHAT: ${profile.profilAcheteur}` : ""
     ].filter(Boolean).join("\n");
 
@@ -47,17 +50,19 @@ export async function POST(req: Request) {
       - Croise au moins 2 données (ex: RPG + Artisanat = Set de dés en pierre taillés main).
       - Si EXPERT, propose du matériel de niche.
       - reasoning: Pas de phrases. Juste des puces avec Emojis.
+
+      🚨 INTERDIT ABSOLU: ne jamais proposer un cadeau contenant: [${blacklistLabels}] 🚨
     `;
 
     const userMessage = `
       PROFIL :
       - ${profile.age} ans, ${profile.relation}, ${profile.genre}
       - Budget: ${profile.budget} | Intention: ${profile.intention}
-      - Vibe: ${profile.pragmatiqueSentimental}% Sentimental
+      - Vibe: Pragmatique ${profile.pragmatiqueSentimental}% | Routine->Originalite ${profile.routineOriginalite}% | Calme->Energie ${profile.calmeEnergie}% | Serieux->Fun ${profile.serieuxFun}% | Objet->Experience ${profile.objetExperience}%
       
       INTÉRÊTS : ${interestList}
       CONTEXTE : ${contextList}
-      BLACKLIST : ${profile.blacklist.map(t => t.label).join(", ")}
+      BLACKLIST : ${blacklistLabels}
 
       Génère 5 nouvelles pépites (DIFFÉRENTES de la liste d'exclusion).
     `;
@@ -68,11 +73,12 @@ export async function POST(req: Request) {
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
       const model = genAI.getGenerativeModel({
         model: modelName,
+        systemInstruction: systemPrompt,
         generationConfig: { responseMimeType: "application/json", temperature: 0.8 }
       });
 
       const result = await model.generateContent({
-        contents: [{ role: "user", parts: [{ text: systemPrompt + "\n\n" + userMessage }] }]
+        contents: [{ role: "user", parts: [{ text: userMessage }] }]
       });
       resultData = JSON.parse(result.response.text());
 
