@@ -23,7 +23,6 @@ interface GiftCardProps {
 }
 
 export function GiftCard({ gift, onDismiss }: GiftCardProps) {
-  const [isDismissed, setIsDismissed] = useState(false)
   const [showBlacklistDialog, setShowBlacklistDialog] = useState(false)
   const [blacklistTag, setBlacklistTag] = useState("")
 
@@ -37,7 +36,6 @@ export function GiftCard({ gift, onDismiss }: GiftCardProps) {
   }
 
   const handleConfirmDismiss = () => {
-    setIsDismissed(true)
     setShowBlacklistDialog(false)
     onDismiss?.(gift.id, blacklistTag.trim() || undefined)
     setBlacklistTag("")
@@ -50,7 +48,7 @@ export function GiftCard({ gift, onDismiss }: GiftCardProps) {
 
   return (
     <>
-      <Card className={`overflow-hidden transition-all ${isDismissed ? "opacity-40 grayscale" : "hover:shadow-lg"}`}>
+      <Card className="overflow-hidden transition-all hover:shadow-lg">
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between gap-2">
             <span className="text-3xl">{gift.emoji}</span>
@@ -58,17 +56,15 @@ export function GiftCard({ gift, onDismiss }: GiftCardProps) {
               <Badge variant="secondary" className="text-xs">
                 {gift.category}
               </Badge>
-              {!isDismissed && (
-                <Button
-                  onClick={handleDismissClick}
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                  title="Ne correspond pas"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              )}
+              <Button
+                onClick={handleDismissClick}
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                title="Ne correspond pas"
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -78,13 +74,7 @@ export function GiftCard({ gift, onDismiss }: GiftCardProps) {
         </CardContent>
         <CardFooter className="flex items-center justify-between pt-3 border-t">
           <span className="font-semibold text-primary text-lg">{gift.price}</span>
-          <Button
-            onClick={handleSearch}
-            size="sm"
-            variant="outline"
-            className="gap-2 bg-transparent"
-            disabled={isDismissed}
-          >
+          <Button onClick={handleSearch} size="sm" variant="outline" className="gap-2 bg-transparent">
             <ExternalLink className="h-4 w-4" />
             Rechercher
           </Button>

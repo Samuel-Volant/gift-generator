@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Sparkles, Gift, Loader2 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
@@ -150,11 +150,13 @@ import { FALLBACK_MODELS, DEFAULT_MODEL, type AIModel } from "@/lib/ai-models"
 export default function GiftGeniusPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [giftResults, setGiftResults] = useState<GiftIdea[]>([])
-  const [usedTagPairs, setUsedTagPairs] = useState<string[][]>([])
   const [availableModels, setAvailableModels] = useState<AIModel[]>(FALLBACK_MODELS)
   const [isLoadingModels, setIsLoadingModels] = useState(true)
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL)
   const { toast } = useToast()
+  // Ref accumulates all already suggested titles to avoid stale closure on rapid clicks
+  // and to keep dismissed titles excluded even after filtering from giftResults
+  const alreadySuggestedTitlesRef = useRef<string[]>([])
 
   // Provider correspondant au modèle sélectionné (utile pour les appels API)
   const selectedProvider = availableModels.find((m) => m.id === selectedModel)?.provider ?? "google"
@@ -209,18 +211,18 @@ export default function GiftGeniusPage() {
   })
 
   const handleGenerateGifts = async () => {
+    if (isLoading) return
     setIsLoading(true)
     try {
-      // Extract titles of already suggested gifts
-      const alreadySuggestedGiftTitles = giftResults.map((g) => g.title)
+      // Use ref to avoid stale closure on rapid double-click
+      const alreadySuggestedGiftTitles = alreadySuggestedTitlesRef.current
 
       const response = await fetch("/api/generate-gifts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           profile,
-          usedTagPairs,
-          alreadySuggestedGiftTitles, // Send to API
+          alreadySuggestedGiftTitles,
           model: selectedModel,
           provider: selectedProvider,
         }),
@@ -234,27 +236,23 @@ export default function GiftGeniusPage() {
       const data = await response.json()
 
       if (data.gift_ideas && data.gift_ideas.length > 0) {
-        setGiftResults((prev) => [...data.gift_ideas, ...prev])
-
-        // Update used tag pairs logic
-        const newPairs = data.gift_ideas
-          .filter((g: any) => g.tags_used && g.tags_used.length === 2)
-          .map((g: any) => g.tags_used)
-
-        if (newPairs.length > 0) {
-          setUsedTagPairs((prev) => [...prev, ...newPairs])
-        }
+        // Append to preserve chronological order (new ideas at the end)
+        setGiftResults((prev) => [...prev, ...data.gift_ideas])
+        // Keep ref in sync for next call - accumulates even if some gifts are dismissed later
+        const newTitles: string[] = (data.gift_ideas as GiftIdea[]).map((g) => g.title)
+        alreadySuggestedTitlesRef.current = [...alreadySuggestedTitlesRef.current, ...newTitles]
 
         toast({
           title: "Idées générées !",
           description: `${data.gift_ideas.length} nouvelles idées trouvées.`,
         })
       }
-    } catch (error: any) {
-      console.error(error)
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.error(message)
       toast({
         title: "Erreur",
-        description: error.message || "Impossible de générer des cadeaux pour le moment.",
+        description: message || "Impossible de générer des cadeaux pour le moment.",
         variant: "destructive",
       })
     } finally {
@@ -263,28 +261,20 @@ export default function GiftGeniusPage() {
   }
 
   const handleDismissGift = (giftId: string, blacklistTag?: string) => {
-    console.log("[v0] handleDismissGift called with:", { giftId, blacklistTag, tagLength: blacklistTag?.length })
     if (blacklistTag && blacklistTag.trim().length > 0) {
       const normalizedTag = blacklistTag.trim().toLowerCase()
-      const isDuplicate = profile.blacklist.some((tag) => tag.label.toLowerCase() === normalizedTag)
-
-      if (isDuplicate) {
-        console.log("[v0] Tag already exists in blacklist, skipping")
-        return
-      }
-
-      console.log("[v0] Adding to blacklist:", blacklistTag)
-      const newTag: Tag = {
-        id: `${Date.now()}-${Math.random()}`,
-        label: blacklistTag.trim(),
-      }
-      setProfile({
-        ...profile,
-        blacklist: [...profile.blacklist, newTag],
+      setProfile((prev) => {
+        const isDuplicate = prev.blacklist.some((tag) => tag.label.toLowerCase() === normalizedTag)
+        if (isDuplicate) return prev
+        const newTag: Tag = {
+          id: `${Date.now()}-${Math.random()}`,
+          label: blacklistTag.trim(),
+        }
+        return { ...prev, blacklist: [...prev.blacklist, newTag] }
       })
-    } else {
-      console.log("[v0] No tag to add or empty tag")
     }
+    // Remove dismissed card from results so it no longer takes space
+    setGiftResults((prev) => prev.filter((g) => g.id !== giftId))
   }
 
   return (
@@ -340,12 +330,12 @@ export default function GiftGeniusPage() {
                     id="age"
                     type="number"
                     value={profile.age}
-                    onChange={(e) => setProfile({ ...profile, age: Number(e.target.value) })}
+                    onChange={(e) => setProfile((prev) => ({ ...prev, age: Number(e.target.value) }))}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="genre">Genre</Label>
-                  <Select value={profile.genre} onValueChange={(value: string) => setProfile({ ...profile, genre: value })}>
+                  <Select value={profile.genre} onValueChange={(value: string) => setProfile((prev) => ({ ...prev, genre: value }))}>
                     <SelectTrigger id="genre">
                       <SelectValue />
                     </SelectTrigger>
@@ -361,7 +351,7 @@ export default function GiftGeniusPage() {
                   <Label htmlFor="relation">Relation</Label>
                   <Select
                     value={profile.relation}
-                    onValueChange={(value: string) => setProfile({ ...profile, relation: value })}
+                    onValueChange={(value: string) => setProfile((prev) => ({ ...prev, relation: value }))}
                   >
                     <SelectTrigger id="relation">
                       <SelectValue />
@@ -389,35 +379,35 @@ export default function GiftGeniusPage() {
                   leftLabel="Pragmatique"
                   rightLabel="Sentimental"
                   value={profile.pragmatiqueSentimental}
-                  onChange={(value) => setProfile({ ...profile, pragmatiqueSentimental: value })}
+                  onChange={(value) => setProfile((prev) => ({ ...prev, pragmatiqueSentimental: value }))}
                 />
                 <PsychologySlider
                   label="Style de vie"
                   leftLabel="Routine"
                   rightLabel="Originalité"
                   value={profile.routineOriginalite}
-                  onChange={(value) => setProfile({ ...profile, routineOriginalite: value })}
+                  onChange={(value) => setProfile((prev) => ({ ...prev, routineOriginalite: value }))}
                 />
                 <PsychologySlider
                   label="Énergie"
                   leftLabel="Calme"
                   rightLabel="Énergie"
                   value={profile.calmeEnergie}
-                  onChange={(value) => setProfile({ ...profile, calmeEnergie: value })}
+                  onChange={(value) => setProfile((prev) => ({ ...prev, calmeEnergie: value }))}
                 />
                 <PsychologySlider
                   label="Personnalité"
                   leftLabel="Sérieux"
                   rightLabel="Fun"
                   value={profile.serieuxFun}
-                  onChange={(value) => setProfile({ ...profile, serieuxFun: value })}
+                  onChange={(value) => setProfile((prev) => ({ ...prev, serieuxFun: value }))}
                 />
                 <PsychologySlider
                   label="Préférence cadeau"
                   leftLabel="Objet"
                   rightLabel="Expérience"
                   value={profile.objetExperience}
-                  onChange={(value) => setProfile({ ...profile, objetExperience: value })}
+                  onChange={(value) => setProfile((prev) => ({ ...prev, objetExperience: value }))}
                 />
               </CardContent>
             </Card>
@@ -430,7 +420,7 @@ export default function GiftGeniusPage() {
               <CardContent>
                 <InterestTagManager
                   interests={profile.interets}
-                  onInterestsChange={(interests) => setProfile({ ...profile, interets: interests })}
+                  onInterestsChange={(interests) => setProfile((prev) => ({ ...prev, interets: interests }))}
                   defaultSuggestions={["Lecture", "Musique", "Cinéma", "Gaming", "Voyages"]}
                   sliders={{
                     pragmatiqueSentimental: profile.pragmatiqueSentimental,
@@ -455,7 +445,7 @@ export default function GiftGeniusPage() {
                   <Label className="mb-3 block font-semibold">Moment de Vie</Label>
                   <SmartTagManager
                     selectedTags={profile.momentDeVie}
-                    onTagsChange={(tags: Tag[]) => setProfile({ ...profile, momentDeVie: tags })}
+                    onTagsChange={(tags: Tag[]) => setProfile((prev) => ({ ...prev, momentDeVie: tags }))}
                     defaultSuggestions={[
                       "Étudiant",
                       "Jeune Parent",
@@ -471,7 +461,7 @@ export default function GiftGeniusPage() {
                   <Label className="mb-3 block font-semibold">Rôle dans le groupe</Label>
                   <SmartTagManager
                     selectedTags={profile.roleGroupe}
-                    onTagsChange={(tags: Tag[]) => setProfile({ ...profile, roleGroupe: tags })}
+                    onTagsChange={(tags: Tag[]) => setProfile((prev) => ({ ...prev, roleGroupe: tags }))}
                     defaultSuggestions={[
                       "Le Clown",
                       "Le Leader",
@@ -487,7 +477,7 @@ export default function GiftGeniusPage() {
                   <Label className="mb-3 block font-semibold">Marques Totem</Label>
                   <SmartTagManager
                     selectedTags={profile.marquesTotem}
-                    onTagsChange={(tags: Tag[]) => setProfile({ ...profile, marquesTotem: tags })}
+                    onTagsChange={(tags: Tag[]) => setProfile((prev) => ({ ...prev, marquesTotem: tags }))}
                     defaultSuggestions={["Nike", "Apple", "Decathlon", "Patagonia", "Tesla"]}
                     placeholder="Ajouter une marque..."
                   />
@@ -505,7 +495,7 @@ export default function GiftGeniusPage() {
                   <Label htmlFor="profil-acheteur">Profil d'Acheteur</Label>
                   <Select
                     value={profile.profilAcheteur}
-                    onValueChange={(value: string) => setProfile({ ...profile, profilAcheteur: value })}
+                    onValueChange={(value: string) => setProfile((prev) => ({ ...prev, profilAcheteur: value }))}
                   >
                     <SelectTrigger id="profil-acheteur">
                       <SelectValue />
@@ -524,7 +514,7 @@ export default function GiftGeniusPage() {
                   <Label className="mb-3 block font-semibold">Projets du Moment</Label>
                   <SmartTagManager
                     selectedTags={profile.projets}
-                    onTagsChange={(tags: Tag[]) => setProfile({ ...profile, projets: tags })}
+                    onTagsChange={(tags: Tag[]) => setProfile((prev) => ({ ...prev, projets: tags }))}
                     defaultSuggestions={["Apprendre une langue", "Déménagement", "Road Trip", "Marathon", "Déco Salon"]}
                     placeholder="Ajouter un projet..."
                   />
@@ -533,7 +523,7 @@ export default function GiftGeniusPage() {
                   <Label className="mb-3 block font-semibold">Plaintes Récurrentes</Label>
                   <SmartTagManager
                     selectedTags={profile.plaintes}
-                    onTagsChange={(tags: Tag[]) => setProfile({ ...profile, plaintes: tags })}
+                    onTagsChange={(tags: Tag[]) => setProfile((prev) => ({ ...prev, plaintes: tags }))}
                     defaultSuggestions={["Froid aux pieds", "Manque de temps", "Dos douloureux", "Perd ses clés"]}
                     placeholder="Ajouter une plainte..."
                   />
@@ -549,7 +539,7 @@ export default function GiftGeniusPage() {
               <CardContent>
                 <SmartTagManager
                   selectedTags={profile.blacklist}
-                  onTagsChange={(tags: Tag[]) => setProfile({ ...profile, blacklist: tags })}
+                  onTagsChange={(tags: Tag[]) => setProfile((prev) => ({ ...prev, blacklist: tags }))}
                   defaultSuggestions={["Alcool", "Parfums", "Vêtements", "Gadgets inutiles"]}
                   placeholder="Ajouter à éviter..."
                   variant="danger"
@@ -565,7 +555,7 @@ export default function GiftGeniusPage() {
               <CardContent className="space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="budget">Budget</Label>
-                  <Select value={profile.budget} onValueChange={(value: string) => setProfile({ ...profile, budget: value })}>
+                  <Select value={profile.budget} onValueChange={(value: string) => setProfile((prev) => ({ ...prev, budget: value }))}>
                     <SelectTrigger id="budget">
                       <SelectValue />
                     </SelectTrigger>
@@ -592,7 +582,7 @@ export default function GiftGeniusPage() {
                     ].map((intention) => (
                       <button
                         key={intention.value}
-                        onClick={() => setProfile({ ...profile, intention: intention.value })}
+                        onClick={() => setProfile((prev) => ({ ...prev, intention: intention.value }))}
                         className={`p-4 rounded-lg border-2 transition-all text-left ${profile.intention === intention.value
                           ? "border-primary bg-primary/5 shadow-md"
                           : "border-border hover:border-primary/50"
