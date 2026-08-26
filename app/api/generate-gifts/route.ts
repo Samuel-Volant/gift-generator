@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
-import { UserProfile } from "@/types";
+import { UserProfile, type Provider } from "@/types";
 import { parseJsonSafe } from "@/lib/parse-json";
 
 export async function POST(req: Request) {
@@ -17,7 +17,7 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    const provider: "google" | "groq" = rawProvider === "groq" ? "groq" : "google";
+    const provider: Provider = rawProvider === "groq" ? "groq" : "google";
 
     // On s'assure de bien récupérer la liste des titres déjà suggérés
     const alreadySuggestedGiftTitles: string[] = body.alreadySuggestedGiftTitles || [];

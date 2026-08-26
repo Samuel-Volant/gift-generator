@@ -1,4 +1,12 @@
-export type InterestLevel = "none" | "casual" | "expert"
+export type InterestLevel = "casual" | "expert"
+
+export type Provider = "google" | "groq"
+
+export type Budget = "ne-se-prononce-pas" | "petit" | "moyen" | "eleve" | "premium"
+
+export type Intention = "ne-se-prononce-pas" | "wow" | "utile" | "fun" | "apprendre" | "emouvoir"
+
+export type BuyerProfile = "ne-se-prononce-pas" | "impulsif" | "collectionneur" | "econome" | "reflechi" | "early-adopter"
 
 export interface Interest {
   id: string
@@ -33,7 +41,7 @@ export interface UserProfile {
   marquesTotem: Tag[]
 
   // Contexte & Comportement
-  profilAcheteur: string
+  profilAcheteur: BuyerProfile
   projets: Tag[]
   plaintes: Tag[]
 
@@ -41,8 +49,8 @@ export interface UserProfile {
   blacklist: Tag[]
 
   // Cadre du Cadeau
-  budget: string
-  intention: string
+  budget: Budget
+  intention: Intention
 }
 
 export interface GiftIdea {
@@ -52,4 +60,6 @@ export interface GiftIdea {
   title: string
   reasoning: string
   price: string
+  tags_used?: [string, string]
+  archetype?: string
 }

@@ -11,7 +11,7 @@ import { SmartTagManager } from "@/components/smart-tag-manager"
 import { InterestTagManager } from "@/components/interest-tag-manager"
 import { PsychologySlider } from "@/components/psychology-slider"
 import { GiftCard } from "@/components/gift-card"
-import type { UserProfile, GiftIdea, Tag } from "@/types"
+import type { UserProfile, GiftIdea, Tag, Budget, Intention, BuyerProfile } from "@/types"
 import { useToast } from "@/hooks/use-toast"
 
 // Mock Data
@@ -495,7 +495,7 @@ export default function GiftGeniusPage() {
                   <Label htmlFor="profil-acheteur">Profil d'Acheteur</Label>
                   <Select
                     value={profile.profilAcheteur}
-                    onValueChange={(value: string) => setProfile((prev) => ({ ...prev, profilAcheteur: value }))}
+                    onValueChange={(value: string) => setProfile((prev) => ({ ...prev, profilAcheteur: value as BuyerProfile }))}
                   >
                     <SelectTrigger id="profil-acheteur">
                       <SelectValue />
@@ -555,7 +555,7 @@ export default function GiftGeniusPage() {
               <CardContent className="space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="budget">Budget</Label>
-                  <Select value={profile.budget} onValueChange={(value: string) => setProfile((prev) => ({ ...prev, budget: value }))}>
+                  <Select value={profile.budget} onValueChange={(value: string) => setProfile((prev) => ({ ...prev, budget: value as Budget }))}>
                     <SelectTrigger id="budget">
                       <SelectValue />
                     </SelectTrigger>
@@ -582,7 +582,7 @@ export default function GiftGeniusPage() {
                     ].map((intention) => (
                       <button
                         key={intention.value}
-                        onClick={() => setProfile((prev) => ({ ...prev, intention: intention.value }))}
+                        onClick={() => setProfile((prev) => ({ ...prev, intention: intention.value as Intention }))}
                         className={`p-4 rounded-lg border-2 transition-all text-left ${profile.intention === intention.value
                           ? "border-primary bg-primary/5 shadow-md"
                           : "border-border hover:border-primary/50"

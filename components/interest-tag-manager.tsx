@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
-import type { Interest, InterestLevel } from "@/types"
+import type { Interest, InterestLevel, Provider } from "@/types"
 
 interface InterestTagManagerProps {
   interests: Interest[]
@@ -23,7 +23,7 @@ interface InterestTagManagerProps {
     objetExperience: number
   }
   selectedModel?: string
-  selectedProvider?: "google" | "groq"
+  selectedProvider?: Provider
 }
 
 export function InterestTagManager({

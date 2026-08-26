@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
 import { parseJsonSafe } from "@/lib/parse-json";
+import type { Provider } from "@/types";
 
 export async function POST(req: Request) {
   try {
@@ -33,7 +34,7 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    const provider: "google" | "groq" = rawProvider === "groq" ? "groq" : "google";
+    const provider: Provider = rawProvider === "groq" ? "groq" : "google";
 
     if (provider === "google" && !process.env.GEMINI_API_KEY) {
       return NextResponse.json(

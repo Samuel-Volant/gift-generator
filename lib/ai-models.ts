@@ -1,7 +1,9 @@
+import type { Provider } from "@/types"
+
 export interface AIModel {
     id: string
     name: string
-    provider: "google" | "groq"
+    provider: Provider
 }
 
 // Utilisé uniquement si l'appel à /api/models échoue (ex: hors-ligne, clés API absentes)
