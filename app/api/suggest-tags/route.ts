@@ -3,6 +3,11 @@ import OpenAI from "openai";
 import { NextResponse } from "next/server";
 import { parseJsonSafe } from "@/lib/parse-json";
 import type { Provider } from "@/types";
+import {
+  TAG_SUGGESTION_GOOGLE_SCHEMA,
+  TAG_SUGGESTION_JSON_SCHEMA,
+  buildTagSuggestionPrompt,
+} from "@/lib/prompts/tag-suggestion";
 
 export async function POST(req: Request) {
   try {
@@ -55,12 +60,6 @@ export async function POST(req: Request) {
       );
     }
 
-    const modelConfig = {
-      id: selectedModelId,
-      provider,
-    };
-
-    // Mapper currentTags vers labels uniquement (evite d'envoyer objets Interest complets)
     const tagLabels: string[] = Array.isArray(currentTags)
       ? currentTags
           .map((t: unknown) => {
@@ -73,6 +72,7 @@ export async function POST(req: Request) {
           })
           .map((s: string) => s.trim())
           .filter((s: string) => s.length > 0)
+          .slice(0, 20)
       : [];
 
     const ignoredLabels: string[] = Array.isArray(ignoredTags)
@@ -80,57 +80,27 @@ export async function POST(req: Request) {
           .map((t: unknown) => (typeof t === "string" ? t : String(t ?? "")))
           .map((s: string) => s.trim())
           .filter((s: string) => s.length > 0)
+          .slice(0, 20)
       : [];
 
-    const prompt = `
-      CONTEXTE:
-      Tu es un expert en recommandation de loisirs.
-      
-      OBJECTIF :
-      Suggère 10 NOUVEAUX tags d'intérêts adjacents (Pensée Latérale).
-      
-      CALIBRAGE PRÉCIS DU NIVEAU DE DÉTAIL (CRUCIAL) :
-      Tu dois viser le "Niveau 2 : L'Activité Concrète".
-      
-      ❌ NIVEAU 1 (INTERDIT - TROP ABSTRAIT) :
-      Ne donne PAS de concepts flous.
-      - Mauvais : "Aventure", "Création", "Sport", "Culture", "Bien-être", "Apprentissage".
-      
-      ❌ NIVEAU 3 (INTERDIT - TROP NICHE) :
-      Ne donne PAS de sous-catégories spécifiques.
-      - Mauvais : "Yoga Ashtanga", "Cuisine Moléculaire", "Jazz des années 50".
-      
-       ❌ TAGS DÉJÀ PROPOSÉS OU IGNORÉS (STRICTEMENT INTERDIT) :
-       Ne suggère SURTOUT PAS ces tags (ni leurs synonymes exacts), car l'utilisateur les a déjà vus ou refusés :
-       ${JSON.stringify(ignoredLabels)}
-
-      ✅ NIVEAU 2 (CIBLE - L'ACTIVITÉ CONCRÈTE) :
-      Donne des noms d'activités, de hobbies ou de sujets tangibles.
-      - Bon : "Yoga", "Cuisine", "Jazz", "Poterie", "Astronomie", "Bricolage", "Randonnée".
-      
-       LOGIQUE D'ASSOCIATION (PENSÉE LATÉRALE) :
-       Analyse les tags actuels (${JSON.stringify(tagLabels)}) et les sliders (${JSON.stringify(sliders)}).
-      Trouve des "Cousins" : des activités différentes mais qui plaisent au même type de cerveau.
-      
-      EXEMPLES DE TRANSFORMATION :
-      - Si "Jeux Vidéo" -> Suggère "Jeux de Société" (pas "Jeu"), "Programmation" (pas "Tech"), "Cinéma" (pas "Art").
-      - Si "Randonnée" -> Suggère "Escalade", "Jardinage", "Photographie".
-      - Si "Lecture" -> Suggère "Écriture", "Histoire", "Langues étrangères".
-
-      FORMAT DE RÉPONSE (JSON) :
-      {
-        "suggested_tags": ["Activité 1", "Activité 2", ...]
-      }
-      Retourne uniquement le JSON valide.
-    `;
+    const prompt = buildTagSuggestionPrompt({
+      tagLabels,
+      ignoredLabels,
+      sliders: sliders ?? null,
+    });
 
     let resultData;
 
-    if (modelConfig.provider === "google") {
+    if (provider === "google") {
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
       const model = genAI.getGenerativeModel({
         model: selectedModelId,
-        generationConfig: { responseMimeType: "application/json" }
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: TAG_SUGGESTION_GOOGLE_SCHEMA,
+          temperature: 0.7,
+          maxOutputTokens: 1024,
+        },
       });
 
       const result = await model.generateContent(prompt);
@@ -138,25 +108,62 @@ export async function POST(req: Request) {
       if (!text) {
         throw new Error("Reponse vide du LLM (Google)");
       }
+      try {
+        const candidates = (result.response as unknown as { candidates?: Array<{ finishReason?: string }> }).candidates;
+        console.log(
+          `[suggest-tags] Google length=${text.length} finishReason=${candidates?.[0]?.finishReason ?? "unknown"} model=${selectedModelId}`
+        );
+      } catch {
+        // ignore
+      }
       resultData = parseJsonSafe(text);
-
-    } else if (modelConfig.provider === "groq") {
+    } else if (provider === "groq") {
       const groq = new OpenAI({
         apiKey: process.env.GROQ_API_KEY,
         baseURL: "https://api.groq.com/openai/v1",
       });
 
-      const completion = await groq.chat.completions.create({
-        model: selectedModelId,
-        messages: [
-          { role: "system", content: "You are a helpful assistant that outputs JSON." },
-          { role: "user", content: prompt },
-        ],
-        response_format: { type: "json_object" },
-      });
+      let completion;
+      try {
+        completion = await groq.chat.completions.create({
+          model: selectedModelId,
+          messages: [
+            { role: "system", content: "You are a helpful assistant that outputs JSON." },
+            { role: "user", content: prompt },
+          ],
+          response_format: {
+            type: "json_schema",
+            json_schema: {
+              name: "suggested_tags",
+              schema: TAG_SUGGESTION_JSON_SCHEMA,
+              strict: true,
+            },
+          } as unknown as OpenAI.Chat.Completions.ChatCompletionCreateParams["response_format"],
+          temperature: 0.7,
+          max_tokens: 1024,
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes("json_schema") || msg.includes("response_format")) {
+          completion = await groq.chat.completions.create({
+            model: selectedModelId,
+            messages: [
+              { role: "system", content: "You are a helpful assistant that outputs JSON." },
+              { role: "user", content: prompt },
+            ],
+            response_format: { type: "json_object" },
+            temperature: 0.7,
+            max_tokens: 1024,
+          });
+        } else {
+          throw e;
+        }
+      }
 
       const text = completion.choices[0].message.content;
       if (!text) throw new Error("Reponse vide du LLM (Groq)");
+      const finishReason = (completion.choices[0] as unknown as { finish_reason?: string })?.finish_reason;
+      console.log(`[suggest-tags] Groq length=${text.length} finishReason=${finishReason ?? "unknown"} model=${selectedModelId}`);
       resultData = parseJsonSafe(text);
     } else {
       throw new Error("Provider not supported");

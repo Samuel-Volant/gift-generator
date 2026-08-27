@@ -1,0 +1,19 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`buildTagSuggestionPrompt > snapshot stable 1`] = `
+"Tu es un expert en recommandation de loisirs. Suggère 10 NOUVEAUX tags d'intérêts adjacents (pensée latérale).
+Langue: français, 1-2 mots max par tag, Capitalize (ex: "Poteries", "Randonnée").
+
+Niveau visé — L'Activité Concrète (Niveau 2) :
+✅ Bon: "Yoga", "Cuisine", "Jazz", "Poterie", "Astronomie" (activité tangible).
+❌ Mauvais: "Aventure"/"Création" (trop abstrait, Niveau 1) et "Yoga Ashtanga"/"Cuisine Moléculaire" (trop niche, Niveau 3).
+
+Logique : trouve des "Cousins" (activités différentes mais même profil).
+Ex: "Jeux Vidéo" -> "Jeux de Société", "Programmation" | "Randonnée" -> "Escalade", "Photographie".
+
+Tags actuels: [Lecture, Cuisine]
+À NE PAS suggérer (déjà vus/refusés): [Sport]
+Vibe sliders: calmeEnergie: plutôt énergie (70%)
+
+Réponds UNIQUEMENT via le schema JSON {suggested_tags: string[10]}."
+`;
