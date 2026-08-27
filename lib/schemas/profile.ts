@@ -25,3 +25,74 @@ export const BudgetFieldsSchema = z
   });
 
 export type BudgetFields = z.infer<typeof BudgetFieldsSchema>;
+
+const TagSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+});
+
+const InterestSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  level: z.enum(["casual", "expert"]),
+});
+
+export const BuyerProfileSchema = z.enum([
+  "ne-se-prononce-pas",
+  "impulsif",
+  "collectionneur",
+  "econome",
+  "reflechi",
+  "early-adopter",
+]);
+
+export const UserProfileSchema = z
+  .object({
+    userId: z.string().optional(),
+    age: z.number().min(0).max(120),
+    genre: z.string(),
+    relation: z.string(),
+    pragmatiqueSentimental: z.number().min(0).max(100),
+    routineOriginalite: z.number().min(0).max(100),
+    calmeEnergie: z.number().min(0).max(100),
+    serieuxFun: z.number().min(0).max(100),
+    objetExperience: z.number().min(0).max(100),
+    interets: z.array(InterestSchema),
+    momentDeVie: z.array(TagSchema),
+    roleGroupe: z.array(TagSchema),
+    marquesTotem: z.array(TagSchema),
+    profilAcheteur: BuyerProfileSchema,
+    projets: z.array(TagSchema),
+    plaintes: z.array(TagSchema),
+    blacklist: z.array(TagSchema),
+    budget: BudgetSchema,
+    budgetMin: BudgetMinSchema,
+    budgetMax: BudgetMaxSchema,
+    intention: z.enum(["ne-se-prononce-pas", "wow", "utile", "fun", "apprendre", "emouvoir"]),
+  })
+  .superRefine((data, ctx) => {
+    const hasMin = typeof data.budgetMin === "number";
+    const hasMax = typeof data.budgetMax === "number";
+    if (hasMin && hasMax && data.budgetMax! <= data.budgetMin!) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Le maximum doit être supérieur au minimum",
+        path: ["budgetMax"],
+      });
+    }
+  });
+
+export type UserProfileValidated = z.infer<typeof UserProfileSchema>;
+
+export const GiftIdeaStorageSchema = z.object({
+  id: z.string(),
+  emoji: z.string(),
+  category: z.string(),
+  title: z.string(),
+  reasoning: z.string(),
+  price: z.string(),
+  tags_used: z.tuple([z.string(), z.string()]).optional(),
+  archetype: z.string().optional(),
+});
+
+export const GiftIdeasStorageSchema = z.array(GiftIdeaStorageSchema);

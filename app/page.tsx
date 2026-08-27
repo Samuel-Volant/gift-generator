@@ -1,31 +1,47 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { Sparkles, Gift, Loader2 } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Sparkles, Gift, Loader2, RotateCcw } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import { SmartTagManager } from "@/components/smart-tag-manager"
 import { InterestTagManager } from "@/components/interest-tag-manager"
 import { PsychologySlider } from "@/components/psychology-slider"
 import { GiftCard } from "@/components/gift-card"
-import type { UserProfile, GiftIdea, Tag, Budget, Intention, BuyerProfile } from "@/types"
+import type { Tag, Budget, Intention, BuyerProfile } from "@/types"
 import { useToast } from "@/hooks/use-toast"
 import { FALLBACK_MODELS, DEFAULT_MODEL, type AIModel } from "@/lib/ai-models"
 import { validateBudgetRange } from "@/lib/prompts/helpers"
+import { usePersistedProfile } from "@/hooks/use-persisted-profile"
 
 export default function GiftGeniusPage() {
   const [isLoading, setIsLoading] = useState(false)
-  const [giftResults, setGiftResults] = useState<GiftIdea[]>([])
   const [availableModels, setAvailableModels] = useState<AIModel[]>(FALLBACK_MODELS)
   const [isLoadingModels, setIsLoadingModels] = useState(true)
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL)
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false)
   const { toast } = useToast()
-  // Ref accumulates all already suggested titles to avoid stale closure on rapid clicks
-  // and to keep dismissed titles excluded even after filtering from giftResults
-  const alreadySuggestedTitlesRef = useRef<string[]>([])
+  const {
+    profile,
+    setProfile,
+    giftResults,
+    appendGifts,
+    dismissGift,
+    alreadySuggestedTitles,
+    clearAll,
+  } = usePersistedProfile()
 
   // Provider correspondant au modèle sélectionné (utile pour les appels API)
   const selectedProvider = availableModels.find((m) => m.id === selectedModel)?.provider ?? "google"
@@ -58,27 +74,6 @@ export default function GiftGeniusPage() {
     }
   }, [])
 
-  const [profile, setProfile] = useState<UserProfile>({
-    age: 28,
-    genre: "non-binaire",
-    relation: "ami",
-    pragmatiqueSentimental: 40,
-    routineOriginalite: 65,
-    calmeEnergie: 70,
-    serieuxFun: 60,
-    objetExperience: 55,
-    interets: [],
-    momentDeVie: [],
-    roleGroupe: [],
-    marquesTotem: [],
-    profilAcheteur: "ne-se-prononce-pas",
-    projets: [],
-    plaintes: [],
-    blacklist: [],
-    budget: "ne-se-prononce-pas",
-    intention: "ne-se-prononce-pas",
-  })
-
   const budgetError = validateBudgetRange(profile.budgetMin, profile.budgetMax)
 
   const handleGenerateGifts = async () => {
@@ -89,8 +84,7 @@ export default function GiftGeniusPage() {
     if (isLoading) return
     setIsLoading(true)
     try {
-      // Use ref to avoid stale closure on rapid double-click
-      const alreadySuggestedGiftTitles = alreadySuggestedTitlesRef.current
+      const alreadySuggestedGiftTitles = alreadySuggestedTitles
 
       const response = await fetch("/api/generate-gifts", {
         method: "POST",
@@ -111,11 +105,7 @@ export default function GiftGeniusPage() {
       const data = await response.json()
 
       if (data.gift_ideas && data.gift_ideas.length > 0) {
-        // Append to preserve chronological order (new ideas at the end)
-        setGiftResults((prev) => [...prev, ...data.gift_ideas])
-        // Keep ref in sync for next call - accumulates even if some gifts are dismissed later
-        const newTitles: string[] = (data.gift_ideas as GiftIdea[]).map((g) => g.title)
-        alreadySuggestedTitlesRef.current = [...alreadySuggestedTitlesRef.current, ...newTitles]
+        appendGifts(data.gift_ideas)
 
         toast({
           title: "Idées générées !",
@@ -148,8 +138,16 @@ export default function GiftGeniusPage() {
         return { ...prev, blacklist: [...prev.blacklist, newTag] }
       })
     }
-    // Remove dismissed card from results so it no longer takes space
-    setGiftResults((prev) => prev.filter((g) => g.id !== giftId))
+    dismissGift(giftId)
+  }
+
+  const handleReset = () => {
+    clearAll()
+    setIsResetDialogOpen(false)
+    toast({
+      title: "Réinitialisé",
+      description: "Profil et cadeaux effacés. LocalStorage vidé.",
+    })
   }
 
   return (
@@ -184,6 +182,31 @@ export default function GiftGeniusPage() {
                   ))}
                 </SelectContent>
               </Select>
+              <Dialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1.5 bg-transparent" aria-label="Réinitialiser profil et cadeaux">
+                    <RotateCcw className="h-4 w-4" />
+                    <span className="hidden sm:inline">Réinitialiser</span>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Réinitialiser ?</DialogTitle>
+                    <DialogDescription>
+                      Cette action effacera le profil, les cadeaux générés et l&apos;historique des titres déjà suggérés
+                      stockés en local. Cette action est irréversible.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsResetDialogOpen(false)}>
+                      Annuler
+                    </Button>
+                    <Button variant="destructive" onClick={handleReset}>
+                      Confirmer la réinitialisation
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
         </div>

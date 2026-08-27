@@ -23,6 +23,8 @@ export interface Tag {
 }
 
 export interface UserProfile {
+  /** Future auth — nullable pour prepa comptes (issue #17) */
+  userId?: string
   // Identité
   age: number
   genre: string
