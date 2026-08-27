@@ -11,7 +11,6 @@ async function fetchGoogleModels(): Promise<AIModel[]> {
   try {
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}&pageSize=100`,
-      { next: { revalidate: 3600 } },
     )
     if (!res.ok) return []
 
@@ -61,7 +60,6 @@ async function fetchGroqModels(): Promise<AIModel[]> {
   try {
     const res = await fetch("https://api.groq.com/openai/v1/models", {
       headers: { Authorization: `Bearer ${apiKey}` },
-      next: { revalidate: 3600 },
     })
     if (!res.ok) return []
 

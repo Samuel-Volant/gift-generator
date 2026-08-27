@@ -13,6 +13,11 @@ export const FALLBACK_MODELS: AIModel[] = [
         name: "✨ Gemini 2.0 Flash (Google · Gratuit)",
         provider: "google",
     },
+    {
+        id: "llama-3.1-8b-instant",
+        name: "🦙 Llama 3.1 8B Instant (Groq · Gratuit)",
+        provider: "groq",
+    },
 ]
 
 export const DEFAULT_MODEL = FALLBACK_MODELS[0].id

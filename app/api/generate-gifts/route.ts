@@ -1,8 +1,87 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, SchemaType, type Schema } from "@google/generative-ai";
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
 import { UserProfile, type Provider } from "@/types";
 import { parseJsonSafe } from "@/lib/parse-json";
+import { validateGiftIdeasPayload } from "@/lib/validate-gifts";
+
+// JSON Schema partagé pour structured output (Groq) — gardé en clair pour lisibilité
+const GIFT_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    gift_ideas: {
+      type: "array",
+      minItems: 5,
+      maxItems: 5,
+      items: {
+        type: "object",
+        properties: {
+          emoji: { type: "string" },
+          category: { type: "string" },
+          title: { type: "string" },
+          reasoning: { type: "string" },
+          price: { type: "string" },
+          tags_used: {
+            type: "array",
+            items: { type: "string" },
+            minItems: 2,
+            maxItems: 2,
+          },
+          archetype: { type: "string" },
+        },
+        required: ["emoji", "category", "title", "reasoning", "price"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["gift_ideas"],
+  additionalProperties: false,
+} as const;
+
+// ResponseSchema Google (SDK SchemaType)
+const GOOGLE_RESPONSE_SCHEMA: Schema = {
+  type: SchemaType.OBJECT,
+  properties: {
+    gift_ideas: {
+      type: SchemaType.ARRAY,
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          emoji: { type: SchemaType.STRING },
+          category: { type: SchemaType.STRING },
+          title: { type: SchemaType.STRING },
+          reasoning: { type: SchemaType.STRING },
+          price: { type: SchemaType.STRING },
+          tags_used: {
+            type: SchemaType.ARRAY,
+            items: { type: SchemaType.STRING },
+          },
+          archetype: { type: SchemaType.STRING },
+        },
+        required: ["emoji", "category", "title", "reasoning", "price"],
+      },
+    },
+  },
+  required: ["gift_ideas"],
+};
+
+// Consigne JSON stricte injectée dans prompts — évite toute déviation de clé/format
+const JSON_FORMAT_INSTRUCTION = `
+🚨 FORMAT DE SORTIE JSON OBLIGATOIRE 🚨
+Tu DOIS répondre UNIQUEMENT avec un JSON valide (sans markdown, sans commentaire, sans texte hors JSON) de la forme EXACTE:
+{"gift_ideas": [{"emoji":"🎁","category":"Tech","title":"Nom du cadeau","reasoning":"• puce 1\\n• puce 2","price":"25€","tags_used":["tag1","tag2"],"archetype":"OBJET DURABLE"}]}
+Règles strictes:
+- Clé racine OBLIGATOIRE: "gift_ideas" (snake_case, exactement ce nom). INTERDIT: gifts, giftIdeas, ideas, suggestions, ou array brut.
+- Nombre EXACT: 5 objets dans gift_ideas, pas plus, pas moins.
+- Champs obligatoires par cadeau: emoji (string), category (string), title (string), reasoning (string avec puces + emojis), price (string ex: "20€").
+- Champs optionnels: tags_used ([string,string] exactement 2 tags), archetype (string parmi: OBJET DURABLE, EXPERIENCE, CONSOMMABLE, SAVOIR, SERVICE).
+- Aucun champ supplémentaire non listé, aucun texte avant/après le JSON.
+`.trim();
+
+function truncateForLog(text: string, max = 500): string {
+  if (text.length <= max) return text;
+  return text.slice(0, max) + `... [truncated ${text.length - max} chars]`;
+}
 
 export async function POST(req: Request) {
   try {
@@ -70,7 +149,7 @@ export async function POST(req: Request) {
       profile.profilAcheteur !== "ne-se-prononce-pas" ? `💳 STYLE ACHAT: ${profile.profilAcheteur}` : ""
     ].filter(Boolean).join("\n");
 
-    // 1. SYSTEM PROMPT RENFORCÉ
+    // 1. SYSTEM PROMPT RENFORCÉ + consigne JSON stricte
     const systemPrompt = `
       Tu es un "Curator" de Concept Store expert.
       
@@ -93,6 +172,8 @@ export async function POST(req: Request) {
       - reasoning: Pas de phrases. Juste des puces avec Emojis.
 
       🚨 INTERDIT ABSOLU: ne jamais proposer un cadeau contenant: [${blacklistLabels}] 🚨
+
+      ${JSON_FORMAT_INSTRUCTION}
     `;
 
     const userMessage = `
@@ -106,61 +187,126 @@ export async function POST(req: Request) {
       BLACKLIST : ${blacklistLabels}
 
       Génère 5 nouvelles pépites (DIFFÉRENTES de la liste d'exclusion).
+      RAPPEL FORMAT: réponds UNIQUEMENT avec {"gift_ideas":[...5 objets...]} en respectant le schéma ci-dessus. Aucune autre clé, aucun texte hors JSON.
     `;
 
-    let resultData: unknown;
+    // Fonction interne: appel LLM + validation avec retry 1x
+    async function callLLMAndValidate(): Promise<{ gift_ideas: Record<string, unknown>[]; rawText: string }> {
+      let lastRawText = "";
+      let lastError: unknown = null;
 
-    if (provider === "google") {
-      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-      const model = genAI.getGenerativeModel({
-        model: modelName,
-        systemInstruction: systemPrompt,
-        generationConfig: { responseMimeType: "application/json", temperature: 0.8 },
-      });
+      for (let attempt = 0; attempt < 2; attempt++) {
+        let rawText: string | null | undefined;
 
-      const result = await model.generateContent({
-        contents: [{ role: "user", parts: [{ text: userMessage }] }],
-      });
-      const text = result.response.text();
-      if (!text) {
-        throw new Error("Reponse vide du LLM (Google)");
+        if (provider === "google") {
+          const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+          const model = genAI.getGenerativeModel({
+            model: modelName,
+            systemInstruction: systemPrompt,
+            generationConfig: {
+              responseMimeType: "application/json",
+              responseSchema: GOOGLE_RESPONSE_SCHEMA,
+              temperature: 0.8,
+            },
+          });
+
+          const result = await model.generateContent({
+            contents: [{ role: "user", parts: [{ text: userMessage }] }],
+          });
+          rawText = result.response.text();
+          if (!rawText) {
+            throw new Error("Reponse vide du LLM (Google)");
+          }
+        } else if (provider === "groq") {
+          const groq = new OpenAI({
+            apiKey: process.env.GROQ_API_KEY,
+            baseURL: "https://api.groq.com/openai/v1",
+          });
+
+          // Tentative json_schema, fallback vers json_object si le modèle ne supporte pas
+          let completion;
+          try {
+            completion = await groq.chat.completions.create({
+              model: modelName,
+              messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userMessage },
+              ],
+              response_format: {
+                type: "json_schema",
+                json_schema: {
+                  name: "gift_ideas",
+                  schema: GIFT_JSON_SCHEMA,
+                  strict: true,
+                },
+              } as unknown as OpenAI.Chat.Completions.ChatCompletionCreateParams["response_format"],
+              temperature: 0.8,
+            });
+          } catch (e) {
+            // Fallback si json_schema non supporté (erreur 400)
+            const msg = e instanceof Error ? e.message : String(e);
+            if (msg.includes("json_schema") || msg.includes("response_format")) {
+              completion = await groq.chat.completions.create({
+                model: modelName,
+                messages: [
+                  { role: "system", content: systemPrompt },
+                  { role: "user", content: userMessage },
+                ],
+                response_format: { type: "json_object" },
+                temperature: 0.8,
+              });
+            } else {
+              throw e;
+            }
+          }
+          rawText = completion.choices[0]?.message?.content;
+          if (!rawText) {
+            throw new Error("Reponse vide du LLM (Groq)");
+          }
+        }
+
+        lastRawText = rawText ?? "";
+        const parsed = parseJsonSafe(lastRawText);
+
+        try {
+          const validated = validateGiftIdeasPayload(parsed);
+          return { gift_ideas: validated.gift_ideas as unknown as Record<string, unknown>[], rawText: lastRawText };
+        } catch (validationError) {
+          lastError = validationError;
+          console.error(
+            `[generate-gifts] Validation echouee (tentative ${attempt + 1}/2) provider=${provider} model=${modelName}:`,
+            validationError instanceof Error ? validationError.message : String(validationError),
+            "\nPayload brut (500 chars):",
+            truncateForLog(lastRawText)
+          );
+          if (attempt === 0) {
+            // retry une fois
+            continue;
+          }
+          // après 2 tentatives on propage
+          throw validationError;
+        }
       }
-      resultData = parseJsonSafe(text);
-
-    } else if (provider === "groq") {
-      const groq = new OpenAI({
-        apiKey: process.env.GROQ_API_KEY,
-        baseURL: "https://api.groq.com/openai/v1",
-      });
-
-      const completion = await groq.chat.completions.create({
-        model: modelName,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userMessage },
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.8,
-      });
-      const text = completion.choices[0]?.message?.content;
-      if (!text) {
-        throw new Error("Reponse vide du LLM (Groq)");
-      }
-      resultData = parseJsonSafe(text);
+      // Ne devrait jamais arriver
+      throw lastError ?? new Error("Format LLM invalide: echec validation apres retry");
     }
 
-    if (
-      !resultData ||
-      typeof resultData !== "object" ||
-      !("gift_ideas" in resultData) ||
-      !Array.isArray((resultData as { gift_ideas: unknown }).gift_ideas)
-    ) {
-      throw new Error("Format LLM invalide: 'gift_ideas' manquant ou non-array");
+    let giftIdeas: Record<string, unknown>[];
+    try {
+      const result = await callLLMAndValidate();
+      giftIdeas = result.gift_ideas;
+    } catch (validationOrLLMError) {
+      const message = validationOrLLMError instanceof Error ? validationOrLLMError.message : String(validationOrLLMError);
+      // Si c'est une erreur de validation format LLM après retry => 502, sinon 500
+      const isValidationError = message.includes("Format LLM invalide");
+      console.error("[generate-gifts] Echec final:", message);
+      return NextResponse.json(
+        { error: isValidationError ? "LLM format invalide apres retry" : "Failed", details: message },
+        { status: isValidationError ? 502 : 500 }
+      );
     }
 
-    const giftsWithIds = (
-      (resultData as { gift_ideas: Record<string, unknown>[] }).gift_ideas
-    ).map((gift) => ({
+    const giftsWithIds = giftIdeas.map((gift) => ({
       ...gift,
       id:
         typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
@@ -173,6 +319,7 @@ export async function POST(req: Request) {
   } catch (error: unknown) {
     console.error("Error:", error);
     const message = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: "Failed", details: message }, { status: 500 });
+    const isValidation = message.includes("Format LLM invalide");
+    return NextResponse.json({ error: "Failed", details: message }, { status: isValidation ? 502 : 500 });
   }
 }
