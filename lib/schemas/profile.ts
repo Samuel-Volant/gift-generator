@@ -46,12 +46,15 @@ export const BuyerProfileSchema = z.enum([
   "early-adopter",
 ]);
 
+export const GenreSchema = z.enum(["homme", "femme", "non-binaire", "autre"]);
+export const RelationSchema = z.enum(["ami", "famille", "collegue", "partenaire", "connaissance"]);
+
 export const UserProfileSchema = z
   .object({
     userId: z.string().optional(),
     age: z.number().min(0).max(120),
-    genre: z.string(),
-    relation: z.string(),
+    genre: GenreSchema,
+    relation: RelationSchema,
     pragmatiqueSentimental: z.number().min(0).max(100),
     routineOriginalite: z.number().min(0).max(100),
     calmeEnergie: z.number().min(0).max(100),

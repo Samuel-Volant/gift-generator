@@ -1,5 +1,9 @@
 "use client"
 
+// @deprecated SmartTagManager est désormais un alias fin de BaseTagManager (issue #18).
+// Conservé pour compatibilité — nouvelles utilisations : importer BaseTagManager directement.
+// InterestTagManager conserve sa logique métier (niveau expert / suggestions IA).
+
 import { BaseTagManager } from "@/components/tag-manager-base"
 import type { Tag } from "@/types"
 

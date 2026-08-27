@@ -9,6 +9,12 @@ export type BudgetPreset = Budget
 
 export type Intention = "ne-se-prononce-pas" | "wow" | "utile" | "fun" | "apprendre" | "emouvoir"
 
+export const GENRES = ["homme", "femme", "non-binaire", "autre"] as const;
+export type Genre = (typeof GENRES)[number];
+
+export const RELATIONS = ["ami", "famille", "collegue", "partenaire", "connaissance"] as const;
+export type Relation = (typeof RELATIONS)[number];
+
 export type BuyerProfile = "ne-se-prononce-pas" | "impulsif" | "collectionneur" | "econome" | "reflechi" | "early-adopter"
 
 export interface Interest {
@@ -27,8 +33,8 @@ export interface UserProfile {
   userId?: string
   // Identité
   age: number
-  genre: string
-  relation: string
+  genre: Genre
+  relation: Relation
 
   // Psychologie (Sliders 0-100)
   pragmatiqueSentimental: number // 0 = Pragmatique, 100 = Sentimental
