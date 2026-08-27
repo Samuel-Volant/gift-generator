@@ -1,5 +1,5 @@
 import { SchemaType, type Schema } from "@google/generative-ai";
-import { budgetLabelMap, intentionMap, describeSlider, escapeXml } from "./helpers";
+import { budgetLabelMap, intentionMap, describeSlider, escapeXml, formatBudget } from "./helpers";
 import type { UserProfile } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -188,7 +188,7 @@ export function buildGiftUserMessage(
   const vibe = buildVibe(profile);
   const interets = interetsXml(profile);
   const contexte = contexteXml(profile);
-  const budget = budgetLabelMap[profile.budget] ?? budgetLabelMap["ne-se-prononce-pas"];
+  const budget = formatBudget({ budget: profile.budget, budgetMin: profile.budgetMin, budgetMax: profile.budgetMax });
   const intention = intentionMap[profile.intention] ?? intentionMap["ne-se-prononce-pas"];
 
   const profilXml = [

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { describeSlider, escapeXml, sanitizeTagLabels, budgetLabelMap, intentionMap } from "./helpers";
+import { describeSlider, escapeXml, sanitizeTagLabels, budgetLabelMap, intentionMap, formatBudget, validateBudgetRange } from "./helpers";
 
 describe("escapeXml", () => {
   it("échappe les caractères XML", () => {
@@ -53,5 +53,49 @@ describe("maps", () => {
   });
   it("intentionMap contient wow", () => {
     expect(intentionMap["wow"]).toContain("wow");
+  });
+});
+
+describe("formatBudget", () => {
+  it("preset mapping petit -> <30€", () => {
+    expect(formatBudget({ budget: "petit" })).toContain("<30€");
+  });
+  it("preset moyen -> 30-100€", () => {
+    expect(formatBudget({ budget: "moyen" })).toContain("30-100€");
+  });
+  it("custom min/max prioritaire sur preset", () => {
+    expect(formatBudget({ budget: "moyen", budgetMin: 20, budgetMax: 80 })).toBe(
+      "20-80€ (indication souple, viser cette fourchette mais ne pas bloquer si idée pertinente hors fourchette)",
+    );
+  });
+  it("custom only min", () => {
+    expect(formatBudget({ budget: "petit", budgetMin: 50 })).toContain("à partir de 50€");
+  });
+  it("custom only max", () => {
+    expect(formatBudget({ budget: "premium", budgetMax: 40 })).toContain("jusqu'à 40€");
+  });
+  it("custom invalide fallback preset", () => {
+    // max <= min -> fallback
+    expect(formatBudget({ budget: "moyen", budgetMin: 80, budgetMax: 20 })).toContain("30-100€");
+    // out of range
+    expect(formatBudget({ budget: "petit", budgetMin: -5 })).toContain("<30€");
+  });
+});
+
+describe("validateBudgetRange", () => {
+  it("valide range correct", () => {
+    expect(validateBudgetRange(20, 80)).toBeNull();
+    expect(validateBudgetRange(undefined, undefined)).toBeNull();
+    expect(validateBudgetRange(10, undefined)).toBeNull();
+  });
+  it("min negatif -> error", () => {
+    expect(validateBudgetRange(-1, 10)).toContain("minimum");
+  });
+  it("max hors borne -> error", () => {
+    expect(validateBudgetRange(0, 6000)).toContain("maximum");
+  });
+  it("max <= min -> error", () => {
+    expect(validateBudgetRange(50, 50)).toContain("supérieur");
+    expect(validateBudgetRange(80, 20)).toContain("supérieur");
   });
 });

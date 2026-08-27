@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`buildGiftUserMessage > snapshot structure stable 1`] = `
-"<profil><identite age="28" genre="non-binaire" relation="ami"/><vibe>pragmatique: plutôt pragmatique | routineOriginalite: équilibré, légèrement originalité | calmeEnergie: plutôt énergie | serieuxFun: plutôt sérieux | objetExperience: équilibré</vibe><interets><interet niveau="expert">Jeux de société</interet></interets><contexte><projets>Pédagogie &lt;ludique&gt;</projets><roleGroupe>Meneur</roleGroupe></contexte><budget>budget moyen (~25-60€, indication souple)</budget><intention>fun / divertissant</intention></profil>
+"<profil><identite age="28" genre="non-binaire" relation="ami"/><vibe>pragmatique: plutôt pragmatique | routineOriginalite: équilibré, légèrement originalité | calmeEnergie: plutôt énergie | serieuxFun: plutôt sérieux | objetExperience: équilibré</vibe><interets><interet niveau="expert">Jeux de société</interet></interets><contexte><projets>Pédagogie &lt;ludique&gt;</projets><roleGroupe>Meneur</roleGroupe></contexte><budget>budget moyen (30-100€, indication souple)</budget><intention>fun / divertissant</intention></profil>
 Génère 5 nouvelles pépites DIFFÉRENTES de la liste d'exclusion. Réponds UNIQUEMENT via le schema JSON."
 `;

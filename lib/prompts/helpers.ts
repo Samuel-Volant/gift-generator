@@ -45,11 +45,62 @@ export function describeSlider(value: number, leftLabel: string, rightLabel: str
 
 export const budgetLabelMap: Record<string, string> = {
   "ne-se-prononce-pas": "budget libre (indication souple)",
-  petit: "petit budget (~10-25€, indication souple)",
-  moyen: "budget moyen (~25-60€, indication souple)",
-  eleve: "budget élevé (~60-120€, indication souple)",
-  premium: "budget premium (120€+, indication souple)",
+  petit: "petit budget (<30€, indication souple)",
+  moyen: "budget moyen (30-100€, indication souple)",
+  eleve: "budget élevé (100-300€, indication souple)",
+  premium: "budget premium (>300€, indication souple)",
 };
+
+/**
+ * Formatte le budget pour le prompt.
+ * Si budgetMin/Max sont renseignés et valides, priorise la fourchette précise.
+ * Sinon retombe sur le label du preset.
+ */
+export function formatBudget(params: { budget: string; budgetMin?: number; budgetMax?: number }): string {
+  const hasMin = typeof params.budgetMin === "number" && Number.isFinite(params.budgetMin);
+  const hasMax = typeof params.budgetMax === "number" && Number.isFinite(params.budgetMax);
+
+  if (hasMin || hasMax) {
+    const min = hasMin ? params.budgetMin! : undefined;
+    const max = hasMax ? params.budgetMax! : undefined;
+
+    // Validation silencieuse : si incohérent, fallback preset
+    const minValid = min === undefined || (min >= 0 && min <= 5000);
+    const maxValid = max === undefined || (max >= 0 && max <= 5000);
+    const rangeValid = min === undefined || max === undefined || max > min;
+
+    if (minValid && maxValid && rangeValid) {
+      if (min !== undefined && max !== undefined) {
+        return `${min}-${max}€ (indication souple, viser cette fourchette mais ne pas bloquer si idée pertinente hors fourchette)`;
+      }
+      if (min !== undefined) {
+        return `à partir de ${min}€ (indication souple, viser au-dessus de ${min}€ mais ne pas bloquer)`;
+      }
+      if (max !== undefined) {
+        return `jusqu'à ${max}€ (indication souple, viser en dessous de ${max}€ mais ne pas bloquer)`;
+      }
+    }
+  }
+
+  return budgetLabelMap[params.budget] ?? budgetLabelMap["ne-se-prononce-pas"];
+}
+
+/**
+ * Valide la cohérence budgetMin/max (utilisé côté UI et zod).
+ * Retourne null si valide, sinon message d'erreur.
+ */
+export function validateBudgetRange(
+  budgetMin?: number,
+  budgetMax?: number,
+): string | null {
+  const hasMin = typeof budgetMin === "number" && Number.isFinite(budgetMin);
+  const hasMax = typeof budgetMax === "number" && Number.isFinite(budgetMax);
+
+  if (hasMin && (budgetMin! < 0 || budgetMin! > 5000)) return "Le minimum doit être entre 0 et 5000€";
+  if (hasMax && (budgetMax! < 0 || budgetMax! > 5000)) return "Le maximum doit être entre 0 et 5000€";
+  if (hasMin && hasMax && budgetMax! <= budgetMin!) return "Le maximum doit être supérieur au minimum";
+  return null;
+}
 
 export const intentionMap: Record<string, string> = {
   "ne-se-prononce-pas": "intention libre",

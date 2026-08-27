@@ -4,6 +4,9 @@ export type Provider = "google" | "groq"
 
 export type Budget = "ne-se-prononce-pas" | "petit" | "moyen" | "eleve" | "premium"
 
+// Preset alias for clarity (same union as Budget)
+export type BudgetPreset = Budget
+
 export type Intention = "ne-se-prononce-pas" | "wow" | "utile" | "fun" | "apprendre" | "emouvoir"
 
 export type BuyerProfile = "ne-se-prononce-pas" | "impulsif" | "collectionneur" | "econome" | "reflechi" | "early-adopter"
@@ -50,6 +53,9 @@ export interface UserProfile {
 
   // Cadre du Cadeau
   budget: Budget
+  /** Budget précis optionnel — si renseigné, prioritaire sur le preset pour le prompt */
+  budgetMin?: number
+  budgetMax?: number
   intention: Intention
 }
 

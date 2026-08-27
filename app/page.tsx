@@ -14,6 +14,7 @@ import { GiftCard } from "@/components/gift-card"
 import type { UserProfile, GiftIdea, Tag, Budget, Intention, BuyerProfile } from "@/types"
 import { useToast } from "@/hooks/use-toast"
 import { FALLBACK_MODELS, DEFAULT_MODEL, type AIModel } from "@/lib/ai-models"
+import { validateBudgetRange } from "@/lib/prompts/helpers"
 
 export default function GiftGeniusPage() {
   const [isLoading, setIsLoading] = useState(false)
@@ -78,7 +79,13 @@ export default function GiftGeniusPage() {
     intention: "ne-se-prononce-pas",
   })
 
+  const budgetError = validateBudgetRange(profile.budgetMin, profile.budgetMax)
+
   const handleGenerateGifts = async () => {
+    if (budgetError) {
+      toast({ title: "Budget invalide", description: budgetError, variant: "destructive" })
+      return
+    }
     if (isLoading) return
     setIsLoading(true)
     try {
@@ -435,7 +442,63 @@ export default function GiftGeniusPage() {
                       <SelectItem value="premium">Premium (€€€€ - plus de 300€)</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">Le preset est une indication souple pour le LLM.</p>
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="budgetMin">Min €</Label>
+                    <Input
+                      id="budgetMin"
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      max={5000}
+                      placeholder="20"
+                      value={profile.budgetMin ?? ""}
+                      onChange={(e) => {
+                        const raw = e.target.value
+                        if (raw === "") {
+                          setProfile((prev) => ({ ...prev, budgetMin: undefined }))
+                        } else {
+                          const n = Number(raw)
+                          setProfile((prev) => ({ ...prev, budgetMin: Number.isFinite(n) ? n : undefined }))
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="budgetMax">Max €</Label>
+                    <Input
+                      id="budgetMax"
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      max={5000}
+                      placeholder="80"
+                      value={profile.budgetMax ?? ""}
+                      onChange={(e) => {
+                        const raw = e.target.value
+                        if (raw === "") {
+                          setProfile((prev) => ({ ...prev, budgetMax: undefined }))
+                        } else {
+                          const n = Number(raw)
+                          setProfile((prev) => ({ ...prev, budgetMax: Number.isFinite(n) ? n : undefined }))
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+                {budgetError ? (
+                  <p className="text-sm text-destructive" role="alert">
+                    {budgetError}
+                  </p>
+                ) : (
+                  (profile.budgetMin !== undefined || profile.budgetMax !== undefined) && (
+                    <p className="text-xs text-muted-foreground">
+                      Fourchette précise prioritaire sur le preset pour la génération.
+                    </p>
+                  )
+                )}
 
                 <div className="space-y-3">
                   <Label>Intention</Label>
@@ -473,7 +536,7 @@ export default function GiftGeniusPage() {
                 <h2 className="text-2xl font-bold text-balance">Idées Cadeaux Personnalisées</h2>
                 <Button
                   onClick={handleGenerateGifts}
-                  disabled={isLoading}
+                  disabled={isLoading || !!budgetError}
                   variant="outline"
                   className="gap-2 bg-transparent"
                 >
@@ -511,7 +574,7 @@ export default function GiftGeniusPage() {
                   Cliquez sur le bouton ci-dessous et laissez notre IA analyser ce profil pour vous proposer des idées
                   de cadeaux personnalisées.
                 </p>
-                <Button onClick={handleGenerateGifts} size="lg" disabled={isLoading} className="gap-2 mt-4">
+                <Button onClick={handleGenerateGifts} size="lg" disabled={isLoading || !!budgetError} className="gap-2 mt-4">
                   {isLoading ? (
                     <>
                       <Loader2 className="h-5 w-5 animate-spin" />

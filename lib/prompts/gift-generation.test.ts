@@ -60,6 +60,24 @@ describe("buildGiftUserMessage", () => {
     const msg = buildGiftUserMessage(makeProfile());
     expect(msg).toMatchSnapshot();
   });
+  it("utilise la fourchette précise quand budgetMin/Max renseignés", () => {
+    const msg = buildGiftUserMessage(makeProfile({ budget: "moyen", budgetMin: 20, budgetMax: 80 }));
+    expect(msg).toContain("20-80€");
+    expect(msg).toContain("indication souple");
+    expect(msg).not.toContain("30-100€");
+  });
+  it("fallback preset si budgetMin/Max incohérents", () => {
+    const msg = buildGiftUserMessage(makeProfile({ budget: "moyen", budgetMin: 80, budgetMax: 20 }));
+    expect(msg).toContain("30-100€");
+  });
+  it("affiche à partir de / jusqu'à quand un seul bound", () => {
+    const msgMin = buildGiftUserMessage(makeProfile({ budget: "petit", budgetMin: 50, budgetMax: undefined }));
+    expect(msgMin).toContain("partir de 50€");
+    const msgMax = buildGiftUserMessage(makeProfile({ budget: "petit", budgetMin: undefined, budgetMax: 40 }));
+    // apostrophe échappée en &apos; via escapeXml
+    expect(msgMax).toContain("40€");
+    expect(msgMax).toContain("jusqu");
+  });
 });
 
 describe("buildGiftRetryPrompt", () => {
