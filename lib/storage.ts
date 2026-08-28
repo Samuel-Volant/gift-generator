@@ -8,6 +8,7 @@ export const STORAGE_KEYS = {
   profile: "giftgen:profile",
   gifts: "giftgen:gifts",
   alreadySuggested: "giftgen:alreadySuggested",
+  favorites: "giftgen:favorites",
 } as const;
 
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS] | string;
@@ -76,8 +77,8 @@ export function saveToStorage<T>(key: string, value: T): void {
   if (!isLocalStorageAvailable()) return;
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // silent — observabilité pourra logger plus tard (issue #21)
+  } catch (e) {
+    console.warn(`[storage] saveToStorage failed key=${key}:`, e instanceof Error ? e.message : String(e));
   }
 }
 
@@ -85,8 +86,8 @@ export function removeFromStorage(key: string): void {
   if (!isLocalStorageAvailable()) return;
   try {
     window.localStorage.removeItem(key);
-  } catch {
-    // silent
+  } catch (e) {
+    console.warn(`[storage] removeFromStorage failed key=${key}:`, e instanceof Error ? e.message : String(e));
   }
 }
 

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ExternalLink, X } from "lucide-react"
+import { ExternalLink, Heart, X } from "lucide-react"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -19,10 +19,12 @@ import type { GiftIdea } from "@/types"
 
 interface GiftCardProps {
   gift: GiftIdea
+  isFavorite?: boolean
+  onToggleFavorite?: (giftId: string) => void
   onDismiss?: (giftId: string, blacklistTag?: string) => void
 }
 
-export function GiftCard({ gift, onDismiss }: GiftCardProps) {
+export function GiftCard({ gift, isFavorite, onToggleFavorite, onDismiss }: GiftCardProps) {
   const [showBlacklistDialog, setShowBlacklistDialog] = useState(false)
   const [blacklistTag, setBlacklistTag] = useState("")
 
@@ -56,12 +58,25 @@ export function GiftCard({ gift, onDismiss }: GiftCardProps) {
               <Badge variant="secondary" className="text-xs">
                 {gift.category}
               </Badge>
+              {onToggleFavorite && (
+                <Button
+                  onClick={() => onToggleFavorite(gift.id)}
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  aria-label={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
+                >
+                  <Heart
+                    className={`h-4 w-4 ${isFavorite ? "fill-primary text-primary" : "text-muted-foreground"}`}
+                  />
+                </Button>
+              )}
               <Button
                 onClick={handleDismissClick}
                 size="icon"
                 variant="ghost"
                 className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                title="Ne correspond pas"
+                aria-label="Ne correspond pas"
               >
                 <X className="h-4 w-4" />
               </Button>

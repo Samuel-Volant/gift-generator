@@ -12,11 +12,13 @@ import { GiftFrameCard } from "@/components/profile/gift-frame-card";
 import { GiftResults } from "@/components/gifts/gift-results";
 import { useAvailableModels } from "@/hooks/use-available-models";
 import { useGiftGeneration } from "@/hooks/use-gift-generation";
+import { useFavorites } from "@/hooks/use-favorites";
 
 export default function GiftGeniusPage() {
   const { availableModels, selectedModel, setSelectedModel, selectedProvider, isLoadingModels } = useAvailableModels();
   const { profile, setProfile, giftResults, alreadySuggestedTitles, isLoading, budgetError, handleGenerateGifts, handleDismissGift, handleReset } =
     useGiftGeneration({ selectedModel, selectedProvider });
+  const { favorites, toggleFavorite } = useFavorites();
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const onConfirmReset = () => {
     handleReset();
@@ -32,6 +34,8 @@ export default function GiftGeniusPage() {
         isResetDialogOpen={isResetDialogOpen}
         onResetDialogChange={setIsResetDialogOpen}
         onConfirmReset={onConfirmReset}
+        currentProfile={profile}
+        onLoadProfile={setProfile}
       />
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-7xl mx-auto space-y-8">
@@ -102,6 +106,8 @@ export default function GiftGeniusPage() {
             gifts={giftResults}
             isLoading={isLoading}
             budgetError={budgetError}
+            favorites={favorites}
+            onToggleFavorite={toggleFavorite}
             onGenerateMore={handleGenerateGifts}
             onGenerateFirst={handleGenerateGifts}
             onDismiss={handleDismissGift}
