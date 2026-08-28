@@ -5,7 +5,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { SavedProfilesManager } from "@/components/saved-profiles-manager";
 import type { AIModel } from "@/lib/ai-models";
+import type { UserProfile } from "@/types";
 
 interface AppHeaderProps {
   availableModels: AIModel[];
@@ -15,9 +17,11 @@ interface AppHeaderProps {
   isResetDialogOpen: boolean;
   onResetDialogChange: (open: boolean) => void;
   onConfirmReset: () => void;
+  currentProfile: UserProfile;
+  onLoadProfile: (profile: UserProfile) => void;
 }
 
-export function AppHeader({ availableModels, selectedModel, onModelChange, isLoadingModels, isResetDialogOpen, onResetDialogChange, onConfirmReset }: AppHeaderProps) {
+export function AppHeader({ availableModels, selectedModel, onModelChange, isLoadingModels, isResetDialogOpen, onResetDialogChange, onConfirmReset, currentProfile, onLoadProfile }: AppHeaderProps) {
   return (
     <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
       <div className="container mx-auto px-4 py-4">
@@ -32,6 +36,7 @@ export function AppHeader({ availableModels, selectedModel, onModelChange, isLoa
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <SavedProfilesManager currentProfile={currentProfile} onLoadProfile={onLoadProfile} />
             <Label htmlFor="model-select" className="text-sm font-medium hidden sm:block">
               Modèle IA :
             </Label>

@@ -36,12 +36,13 @@ export interface UserProfile {
   genre: Genre
   relation: Relation
 
-  // Psychologie (Sliders 0-100)
-  pragmatiqueSentimental: number // 0 = Pragmatique, 100 = Sentimental
-  routineOriginalite: number // 0 = Routine, 100 = Originalité
-  calmeEnergie: number // 0 = Calme, 100 = Énergie
-  serieuxFun: number // 0 = Sérieux, 100 = Fun
-  objetExperience: number // 0 = Objet, 100 = Expérience
+  // Psychologie (Sliders 1-5 discrèts)
+  // 1 = très left, 2 = plutôt left, 3 = équilibré, 4 = plutôt right, 5 = très right
+  pragmatiqueSentimental: number // 1=Pragmatique, 5=Sentimental
+  routineOriginalite: number // 1=Routine, 5=Originalité
+  calmeEnergie: number // 1=Calme, 5=Énergie
+  serieuxFun: number // 1=Sérieux, 5=Fun
+  objetExperience: number // 1=Objet, 5=Expérience
 
   // Passions (Intérêts avec niveau)
   interets: Interest[]
@@ -76,4 +77,11 @@ export interface GiftIdea {
   price: string
   tags_used?: [string, string]
   archetype?: string
+}
+
+export interface SavedProfile {
+  id: string
+  name: string
+  profile: UserProfile
+  createdAt: number
 }
