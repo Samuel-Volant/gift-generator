@@ -95,6 +95,7 @@ export function clearGiftGeneratorStorage(): void {
   for (const key of Object.values(STORAGE_KEYS)) {
     removeFromStorage(key);
   }
+  removeFromStorage("giftgen:savedProfiles");
 }
 
 /**

@@ -63,8 +63,8 @@ export function useLocalStorage<T>(
     if (typeof window === "undefined" || typeof window.localStorage === "undefined") return;
     try {
       window.localStorage.setItem(key, JSON.stringify(storedValue));
-    } catch {
-      // quota exceeded / blocked — silent (issue #21 pourra logger)
+    } catch (e) {
+      console.warn(`[useLocalStorage] write failed key=${key}:`, e instanceof Error ? e.message : String(e));
     }
   }, [key, storedValue, isHydrated]);
 
