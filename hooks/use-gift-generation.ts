@@ -20,7 +20,9 @@ export function useGiftGeneration({ selectedModel, selectedProvider }: UseGiftGe
     giftResults,
     appendGifts,
     dismissGift,
+    dismissNonFavorites,
     alreadySuggestedTitles,
+    setAlreadySuggestedTitles,
     clearAll,
     isHydrated,
   } = usePersistedProfile();
@@ -95,6 +97,24 @@ export function useGiftGeneration({ selectedModel, selectedProvider }: UseGiftGe
     [setProfile, dismissGift],
   );
 
+  const handleDismissNonFavorites = useCallback(
+    (favoriteIds: string[]) => {
+      dismissNonFavorites(favoriteIds);
+      toast({
+        title: "Cartes nettoyées",
+        description: "Toutes les cartes non favorites ont été supprimées.",
+      });
+    },
+    [dismissNonFavorites, toast],
+  );
+
+  const handleRemoveSuggestedTitle = useCallback(
+    (title: string) => {
+      setAlreadySuggestedTitles((prev) => prev.filter((t) => t !== title));
+    },
+    [setAlreadySuggestedTitles],
+  );
+
   const handleReset = useCallback(() => {
     clearAll();
     toast({
@@ -112,6 +132,8 @@ export function useGiftGeneration({ selectedModel, selectedProvider }: UseGiftGe
     budgetError,
     handleGenerateGifts,
     handleDismissGift,
+    handleDismissNonFavorites,
+    handleRemoveSuggestedTitle,
     handleReset,
     clearAll,
     isHydrated,

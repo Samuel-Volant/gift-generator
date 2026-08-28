@@ -86,6 +86,13 @@ export function usePersistedProfile() {
     [setGiftResults],
   );
 
+  const dismissNonFavorites = useCallback(
+    (favoriteIds: string[]) => {
+      setGiftResults((prev) => prev.filter((g) => favoriteIds.includes(g.id)));
+    },
+    [setGiftResults],
+  );
+
   const clearAll = useCallback(() => {
     setProfile(DEFAULT_PROFILE);
     setGiftResults([]);
@@ -113,6 +120,7 @@ export function usePersistedProfile() {
       addSuggestedTitles,
       appendGifts,
       dismissGift,
+      dismissNonFavorites,
       clearAll,
       resetProfileOnly,
       isHydrated,
@@ -130,6 +138,7 @@ export function usePersistedProfile() {
       addSuggestedTitles,
       appendGifts,
       dismissGift,
+      dismissNonFavorites,
       clearAll,
       resetProfileOnly,
       isHydrated,

@@ -16,7 +16,7 @@ import { useFavorites } from "@/hooks/use-favorites";
 
 export default function GiftGeniusPage() {
   const { availableModels, selectedModel, setSelectedModel, selectedProvider, isLoadingModels } = useAvailableModels();
-  const { profile, setProfile, giftResults, alreadySuggestedTitles, isLoading, budgetError, handleGenerateGifts, handleDismissGift, handleReset } =
+  const { profile, setProfile, giftResults, alreadySuggestedTitles, isLoading, budgetError, handleGenerateGifts, handleDismissGift, handleDismissNonFavorites, handleRemoveSuggestedTitle, handleReset } =
     useGiftGeneration({ selectedModel, selectedProvider });
   const { favorites, toggleFavorite } = useFavorites();
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
@@ -111,6 +111,8 @@ export default function GiftGeniusPage() {
             onGenerateMore={handleGenerateGifts}
             onGenerateFirst={handleGenerateGifts}
             onDismiss={handleDismissGift}
+            onDismissNonFavorites={handleDismissNonFavorites}
+            onRemoveSuggestedTitle={handleRemoveSuggestedTitle}
             profile={profile}
             alreadySuggestedTitles={alreadySuggestedTitles}
           />

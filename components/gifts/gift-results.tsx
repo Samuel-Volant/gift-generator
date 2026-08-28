@@ -1,13 +1,22 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Sparkles, Loader2, Gift } from "lucide-react";
+import { Sparkles, Loader2, Gift, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { GiftCard } from "@/components/gift-card";
 import { GiftCardSkeleton } from "@/components/gifts/gift-card-skeleton";
 import { GiftFilters, isInSelectedRange } from "@/components/gifts/gift-filters";
 import { PromptPreview } from "@/components/gifts/prompt-preview";
+import { SuggestedHistory } from "@/components/gifts/suggested-history";
 import type { GiftIdea, UserProfile } from "@/types";
 
 interface GiftResultsProps {
@@ -19,13 +28,18 @@ interface GiftResultsProps {
   onGenerateMore: () => void;
   onGenerateFirst: () => void;
   onDismiss: (giftId: string, blacklistTag?: string) => void;
+  onDismissNonFavorites?: (favoriteIds: string[]) => void;
+  onRemoveSuggestedTitle?: (title: string) => void;
   profile: UserProfile;
   alreadySuggestedTitles: string[];
 }
 
-export function GiftResults({ gifts, isLoading, budgetError, favorites, onToggleFavorite, onGenerateMore, onGenerateFirst, onDismiss, profile, alreadySuggestedTitles }: GiftResultsProps) {
+export function GiftResults({ gifts, isLoading, budgetError, favorites, onToggleFavorite, onGenerateMore, onGenerateFirst, onDismiss, onDismissNonFavorites, onRemoveSuggestedTitle, profile, alreadySuggestedTitles }: GiftResultsProps) {
   const [selectedArchetypes, setSelectedArchetypes] = useState<string[]>([]);
   const [selectedPriceRanges, setSelectedPriceRanges] = useState<string[]>([]);
+  const [showDeleteNonFavoritesDialog, setShowDeleteNonFavoritesDialog] = useState(false);
+
+  const hasNonFavorites = useMemo(() => gifts.some((g) => !favorites.includes(g.id)), [gifts, favorites]);
 
   const handleArchetypeToggle = (archetype: string) => {
     setSelectedArchetypes((prev) =>
@@ -55,6 +69,19 @@ export function GiftResults({ gifts, isLoading, budgetError, favorites, onToggle
           <h2 className="text-2xl font-bold text-balance">Idées Cadeaux Personnalisées</h2>
           <div className="flex items-center gap-2">
             <PromptPreview profile={profile} alreadySuggestedTitles={alreadySuggestedTitles} />
+            <SuggestedHistory titles={alreadySuggestedTitles} onRemoveTitle={(t) => onRemoveSuggestedTitle?.(t)} />
+            {gifts.length > 0 && hasNonFavorites && (
+              <Button
+                onClick={() => setShowDeleteNonFavoritesDialog(true)}
+                disabled={isLoading}
+                variant="outline"
+                className="gap-2 bg-transparent text-muted-foreground hover:text-destructive"
+                aria-label="Supprimer les cartes non favorites"
+              >
+                <Trash2 className="h-4 w-4" />
+                Nettoyer non-favorites
+              </Button>
+            )}
             {gifts.length > 0 && (
               <Button onClick={onGenerateMore} disabled={isLoading || !!budgetError} variant="outline" className="gap-2 bg-transparent">
                 {isLoading ? (
@@ -96,6 +123,31 @@ export function GiftResults({ gifts, isLoading, budgetError, favorites, onToggle
           {isLoading &&
             Array.from({ length: 5 }).map((_, i) => <GiftCardSkeleton key={`skeleton-${i}`} />)}
         </div>
+
+        <Dialog open={showDeleteNonFavoritesDialog} onOpenChange={setShowDeleteNonFavoritesDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Supprimer les cartes non favorites ?</DialogTitle>
+              <DialogDescription>
+                Cette action va supprimer toutes les idées cadeaux qui ne sont pas enregistrées dans vos favoris. Continuer ?
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowDeleteNonFavoritesDialog(false)}>
+                Annuler
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  setShowDeleteNonFavoritesDialog(false);
+                  onDismissNonFavorites?.(favorites);
+                }}
+              >
+                Supprimer
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
@@ -118,6 +170,9 @@ export function GiftResults({ gifts, isLoading, budgetError, favorites, onToggle
         </Button>
         <div className="pt-2">
           <PromptPreview profile={profile} alreadySuggestedTitles={alreadySuggestedTitles} />
+          <div className="mt-2 flex justify-center">
+            <SuggestedHistory titles={alreadySuggestedTitles} onRemoveTitle={(t) => onRemoveSuggestedTitle?.(t)} />
+          </div>
         </div>
       </CardContent>
     </Card>
