@@ -9,6 +9,10 @@ export type BudgetPreset = Budget
 
 export type Intention = "ne-se-prononce-pas" | "wow" | "utile" | "fun" | "apprendre" | "emouvoir"
 
+export const SLIDER_MIN = 1;
+export const SLIDER_MAX = 5;
+export type SliderPosition = typeof SLIDER_MIN | 2 | 3 | 4 | typeof SLIDER_MAX;
+
 export const GENRES = ["homme", "femme", "non-binaire", "autre"] as const;
 export type Genre = (typeof GENRES)[number];
 

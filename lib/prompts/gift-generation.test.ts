@@ -7,11 +7,11 @@ function makeProfile(overrides: Partial<UserProfile> = {}): UserProfile {
     age: 28,
     genre: "non-binaire",
     relation: "ami",
-    pragmatiqueSentimental: 40,
-    routineOriginalite: 55,
-    calmeEnergie: 70,
-    serieuxFun: 30,
-    objetExperience: 50,
+    pragmatiqueSentimental: 2,
+    routineOriginalite: 4,
+    calmeEnergie: 5,
+    serieuxFun: 1,
+    objetExperience: 3,
     interets: [{ id: "1", label: "Jeux de société", level: "expert" }],
     momentDeVie: [],
     roleGroupe: [{ id: "r1", label: "Meneur" }],
@@ -46,10 +46,14 @@ describe("buildGiftUserMessage", () => {
     const msg = buildGiftUserMessage(makeProfile());
     expect(msg).toContain("<profil>");
     expect(msg).toContain('<identite age="28"');
-    expect(msg).toContain("plutôt pragmatique"); // 40
-    expect(msg).toContain("équilibré, légèrement originalité"); // 55
+    expect(msg).toContain("plutôt pragmatique"); // 2
+    expect(msg).toContain("plutôt originalité"); // 4
+    expect(msg).toContain("très énergie"); // 5
+    expect(msg).toContain("très sérieux"); // 1
+    // objetExperience: 3 (équilibré) → nothing added
+    expect(msg).not.toContain("objetExperience");
     expect(msg).toContain("<budget>");
-    expect(msg).not.toContain("Pragmatique 40%"); // brut interdit
+    expect(msg).not.toContain("Pragmatique 2%"); // brut interdit
   });
   it("échappe les labels utilisateur (XSS/injection)", () => {
     const msg = buildGiftUserMessage(makeProfile());

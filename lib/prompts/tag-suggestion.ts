@@ -52,9 +52,14 @@ function formatSliders(sliders: Record<string, unknown> | null | undefined): str
       const num = typeof v === "number" ? v : Number(v);
       if (Number.isNaN(num)) return `${k}: ${String(v)}`;
       const labels = sliderLabels[k];
-      if (labels) return `${k}: ${describeSlider(num, labels[0], labels[1])} (${num}%)`;
-      return `${k}: ${num}%`;
+      if (labels) {
+        const desc = describeSlider(num, labels[0], labels[1]);
+        if (!desc) return null; // équilibré, skip
+        return `${k}: ${desc}`;
+      }
+      return `${k}: ${num}`;
     })
+    .filter(Boolean)
     .join(", ");
 }
 

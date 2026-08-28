@@ -69,7 +69,7 @@ export const GOOGLE_RESPONSE_SCHEMA: Schema = {
 // ---------------------------------------------------------------------------
 
 export const GIFT_FEW_SHOT = {
-  user: `<profil><identite age="28" genre="non-binaire" relation="ami"/><vibe>pragmatique: plut\u00f4t pragmatique | routineOriginalite: \u00e9quilibr\u00e9, l\u00e9g\u00e8rement originalit\u00e9 | calmeEnergie: plut\u00f4t \u00e9nergie | serieuxFun: plut\u00f4t fun | objetExperience: \u00e9quilibr\u00e9</vibe><interets><interet niveau="expert">Jeux de soci\u00e9t\u00e9</interet><interet niveau="d\u00e9couverte">Poteries</interet></interets><contexte><projets>P\u00e9dagogie ludique</projets></contexte><budget>budget moyen (~25-60\u20ac, indication souple)</budget><intention>fun / divertissant</intention></profil>`,
+  user: `<profil><identite age="28" genre="non-binaire" relation="ami"/><vibe>pragmatique: plutôt pragmatique | routineOriginalite: plutôt originalité | calmeEnergie: plutôt énergie | serieuxFun: plutôt fun</vibe><interets><interet niveau="expert">Jeux de société</interet><interet niveau="découverte">Poteries</interet></interets><contexte><projets>Pédagogie ludique</projets></contexte><budget>budget moyen (~25-60€, indication souple)</budget><intention>fun / divertissant</intention></profil>`,
   assistant: JSON.stringify({
     gift_ideas: [
       {
@@ -126,13 +126,21 @@ export const GIFT_FEW_SHOT = {
 // ---------------------------------------------------------------------------
 
 function buildVibe(profile: UserProfile): string {
-  return [
-    `pragmatique: ${describeSlider(profile.pragmatiqueSentimental, "Pragmatique", "Sentimental")}`,
-    `routineOriginalite: ${describeSlider(profile.routineOriginalite, "Routine", "Originalité")}`,
-    `calmeEnergie: ${describeSlider(profile.calmeEnergie, "Calme", "Énergie")}`,
-    `serieuxFun: ${describeSlider(profile.serieuxFun, "Sérieux", "Fun")}`,
-    `objetExperience: ${describeSlider(profile.objetExperience, "Objet", "Expérience")}`,
-  ].join(" | ");
+  const sliders: [string, number, string, string][] = [
+    ["pragmatique", profile.pragmatiqueSentimental, "Pragmatique", "Sentimental"],
+    ["routineOriginalite", profile.routineOriginalite, "Routine", "Originalité"],
+    ["calmeEnergie", profile.calmeEnergie, "Calme", "Énergie"],
+    ["serieuxFun", profile.serieuxFun, "Sérieux", "Fun"],
+    ["objetExperience", profile.objetExperience, "Objet", "Expérience"],
+  ];
+  return sliders
+    .map(([key, value, left, right]) => {
+      const desc = describeSlider(value, left, right);
+      if (!desc) return null; // position 3 = équilibré, skip
+      return `${key}: ${desc}`;
+    })
+    .filter(Boolean)
+    .join(" | ");
 }
 
 function interetsXml(profile: UserProfile): string {

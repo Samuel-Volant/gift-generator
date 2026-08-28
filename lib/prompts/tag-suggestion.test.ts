@@ -13,13 +13,13 @@ describe("buildTagSuggestionPrompt", () => {
     const prompt = buildTagSuggestionPrompt({
       tagLabels: ["Jeux Vidéo", "Randonnée"],
       ignoredLabels: ["Yoga"],
-      sliders: { pragmatiqueSentimental: 40, routineOriginalite: 55 },
+      sliders: { pragmatiqueSentimental: 2, routineOriginalite: 4 },
     });
     expect(prompt.length).toBeLessThan(3200);
     expect(prompt).toContain("français");
     expect(prompt).toContain("Niveau 2");
     expect(prompt).toContain('plutôt pragmatique'); // slider sémantique
-    expect(prompt).not.toContain(JSON.stringify({ pragmatiqueSentimental: 40 })); // plus de JSON.stringify brut
+    expect(prompt).not.toContain(JSON.stringify({ pragmatiqueSentimental: 2 })); // plus de JSON.stringify brut
   });
 
   it("limite tags à 20 et sanitize", () => {
@@ -43,7 +43,7 @@ describe("buildTagSuggestionPrompt", () => {
     const prompt = buildTagSuggestionPrompt({
       tagLabels: ["Lecture", "Cuisine"],
       ignoredLabels: ["Sport"],
-      sliders: { calmeEnergie: 70 },
+      sliders: { calmeEnergie: 5 },
     });
     expect(prompt).toMatchSnapshot();
   });

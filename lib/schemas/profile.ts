@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SLIDER_MIN, SLIDER_MAX } from "@/types";
 
 export const BudgetSchema = z.enum(["ne-se-prononce-pas", "petit", "moyen", "eleve", "premium"]);
 
@@ -55,11 +56,11 @@ export const UserProfileSchema = z
     age: z.number().int().min(0).max(120),
     genre: GenreSchema,
     relation: RelationSchema,
-    pragmatiqueSentimental: z.number().min(0).max(100),
-    routineOriginalite: z.number().min(0).max(100),
-    calmeEnergie: z.number().min(0).max(100),
-    serieuxFun: z.number().min(0).max(100),
-    objetExperience: z.number().min(0).max(100),
+    pragmatiqueSentimental: z.number().min(1).max(5).int(),
+    routineOriginalite: z.number().min(1).max(5).int(),
+    calmeEnergie: z.number().min(1).max(5).int(),
+    serieuxFun: z.number().min(1).max(5).int(),
+    objetExperience: z.number().min(1).max(5).int(),
     interets: z.array(InterestSchema).max(20),
     momentDeVie: z.array(TagSchema).max(20),
     roleGroupe: z.array(TagSchema).max(20),

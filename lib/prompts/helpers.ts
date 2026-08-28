@@ -18,29 +18,25 @@ export function escapeXml(value: string): string {
 }
 
 /**
- * Décrit sémantiquement une valeur de slider 0-100.
- * @param value 0-100
- * @param leftLabel label côté 0 (ex: "Pragmatique")
- * @param rightLabel label côté 100 (ex: "Sentimental")
- * @example describeSlider(40, "Pragmatique", "Sentimental") -> "plutôt pragmatique"
- * @example describeSlider(55, "Objet", "Expérience") -> "équilibré, légèrement expérience"
+ * Décrit sémantiquement une position de slider discrète (1-5).
+ * @param value 1-5 (1=très left, 3=équilibré, 5=très right)
+ * @param leftLabel label côté 1 (ex: "Pragmatique")
+ * @param rightLabel label côté 5 (ex: "Sentimental")
+ * @returns le texte envoyé au prompt, ou "" si équilibré (position 3)
+ * @example describeSlider(2, "Pragmatique", "Sentimental") -> "plutôt pragmatique"
+ * @example describeSlider(3, "Objet", "Expérience") -> ""
  */
 export function describeSlider(value: number, leftLabel: string, rightLabel: string): string {
-  const v = Math.max(0, Math.min(100, Math.round(value)));
+  const v = Math.max(1, Math.min(5, Math.round(value)));
   const left = leftLabel.toLowerCase();
   const right = rightLabel.toLowerCase();
 
-  if (v <= 12) return `très ${left}`;
-  if (v <= 42) return `plutôt ${left}`;
-  if (v <= 48) return `légèrement ${left}`;
-  if (v <= 57) {
-    if (v === 50) return "équilibré";
-    if (v < 50) return `équilibré, légèrement ${left}`;
-    return `équilibré, légèrement ${right}`;
-  }
-  if (v <= 63) return `légèrement ${right}`;
-  if (v <= 87) return `plutôt ${right}`;
-  return `très ${right}`;
+  if (v === 1) return `très ${left}`;
+  if (v === 2) return `plutôt ${left}`;
+  if (v === 4) return `plutôt ${right}`;
+  if (v === 5) return `très ${right}`;
+  // v === 3 → équilibré, rien à ajouter au prompt
+  return "";
 }
 
 export const budgetLabelMap: Record<string, string> = {

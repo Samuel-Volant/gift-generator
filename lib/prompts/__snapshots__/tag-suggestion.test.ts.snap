@@ -13,7 +13,7 @@ Ex: "Jeux Vidéo" -> "Jeux de Société", "Programmation" | "Randonnée" -> "Esc
 
 Tags actuels: [Lecture, Cuisine]
 À NE PAS suggérer (déjà vus/refusés): [Sport]
-Vibe sliders: calmeEnergie: plutôt énergie (70%)
+Vibe sliders: calmeEnergie: très énergie
 
 Réponds UNIQUEMENT via le schema JSON {suggested_tags: string[10]}."
 `;

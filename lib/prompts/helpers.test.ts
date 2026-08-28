@@ -9,26 +9,36 @@ describe("escapeXml", () => {
 });
 
 describe("describeSlider", () => {
-  it("40 -> plutôt pragmatique (spec example)", () => {
-    expect(describeSlider(40, "Pragmatique", "Sentimental")).toBe("plutôt pragmatique");
+  it("2 -> plutôt pragmatique", () => {
+    expect(describeSlider(2, "Pragmatique", "Sentimental")).toBe("plutôt pragmatique");
   });
-  it("55 -> équilibré, légèrement expérience (spec example)", () => {
-    expect(describeSlider(55, "Objet", "Expérience")).toBe("équilibré, légèrement expérience");
+  it("4 -> plutôt expérience", () => {
+    expect(describeSlider(4, "Objet", "Expérience")).toBe("plutôt expérience");
   });
-  it("50 -> équilibré", () => {
-    expect(describeSlider(50, "Pragmatique", "Sentimental")).toBe("équilibré");
+  it("3 -> équilibré (empty string)", () => {
+    expect(describeSlider(3, "Pragmatique", "Sentimental")).toBe("");
   });
-  it("0 -> très pragmatique", () => {
+  it("1 -> très pragmatique", () => {
+    expect(describeSlider(1, "Pragmatique", "Sentimental")).toBe("très pragmatique");
+  });
+  it("5 -> très sentimental", () => {
+    expect(describeSlider(5, "Pragmatique", "Sentimental")).toBe("très sentimental");
+  });
+  it("1 -> très routine", () => {
+    expect(describeSlider(1, "Routine", "Originalité")).toBe("très routine");
+  });
+  it("5 -> très originalité", () => {
+    expect(describeSlider(5, "Routine", "Originalité")).toBe("très originalité");
+  });
+  it("clamps below 1 -> très left", () => {
     expect(describeSlider(0, "Pragmatique", "Sentimental")).toBe("très pragmatique");
   });
-  it("100 -> très sentimental", () => {
-    expect(describeSlider(100, "Pragmatique", "Sentimental")).toBe("très sentimental");
+  it("clamps above 5 -> très right", () => {
+    expect(describeSlider(6, "Pragmatique", "Sentimental")).toBe("très sentimental");
   });
-  it("10 -> très left", () => {
-    expect(describeSlider(10, "Routine", "Originalité")).toBe("très routine");
-  });
-  it("90 -> très right", () => {
-    expect(describeSlider(90, "Routine", "Originalité")).toBe("très originalité");
+  it("rounds non-integer values", () => {
+    expect(describeSlider(1.4, "Pragmatique", "Sentimental")).toBe("très pragmatique");
+    expect(describeSlider(1.6, "Pragmatique", "Sentimental")).toBe("plutôt pragmatique");
   });
 });
 
