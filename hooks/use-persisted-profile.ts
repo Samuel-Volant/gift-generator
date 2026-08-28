@@ -3,6 +3,7 @@
 import { useCallback, useMemo } from "react";
 import { useLocalStorage } from "./use-local-storage";
 import { STORAGE_KEYS, dedupeAndLimitTitles, clearGiftGeneratorStorage } from "@/lib/storage";
+import { mergeGiftResults } from "@/lib/gift-ordering";
 import { UserProfileSchema, GiftIdeasStorageSchema } from "@/lib/schemas/profile";
 import type { UserProfile, GiftIdea } from "@/types";
 import { z } from "zod";
@@ -72,7 +73,7 @@ export function usePersistedProfile() {
   const appendGifts = useCallback(
     (newGifts: GiftIdea[]) => {
       if (newGifts.length === 0) return;
-      setGiftResults((prev) => [...prev, ...newGifts]);
+      setGiftResults((prev) => mergeGiftResults(prev, newGifts));
       addSuggestedTitles(newGifts.map((g) => g.title));
     },
     [setGiftResults, addSuggestedTitles],
