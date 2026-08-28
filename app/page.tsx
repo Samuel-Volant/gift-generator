@@ -15,7 +15,7 @@ import { useGiftGeneration } from "@/hooks/use-gift-generation";
 
 export default function GiftGeniusPage() {
   const { availableModels, selectedModel, setSelectedModel, selectedProvider, isLoadingModels } = useAvailableModels();
-  const { profile, setProfile, giftResults, isLoading, budgetError, handleGenerateGifts, handleDismissGift, handleReset } =
+  const { profile, setProfile, giftResults, alreadySuggestedTitles, isLoading, budgetError, handleGenerateGifts, handleDismissGift, handleReset } =
     useGiftGeneration({ selectedModel, selectedProvider });
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const onConfirmReset = () => {
@@ -105,6 +105,8 @@ export default function GiftGeniusPage() {
             onGenerateMore={handleGenerateGifts}
             onGenerateFirst={handleGenerateGifts}
             onDismiss={handleDismissGift}
+            profile={profile}
+            alreadySuggestedTitles={alreadySuggestedTitles}
           />
         </div>
       </main>
