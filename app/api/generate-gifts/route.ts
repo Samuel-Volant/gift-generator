@@ -12,16 +12,64 @@ import {
   buildGiftRetryPrompt,
   GIFT_FEW_SHOT,
 } from "@/lib/prompts/gift-generation";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { UserProfileSchema, AlreadySuggestedGiftTitlesSchema } from "@/lib/schemas/profile";
 
 function truncateForLog(text: string, max = 500): string {
   if (text.length <= max) return text;
   return text.slice(0, max) + `... [truncated ${text.length - max} chars]`;
 }
 
+export const maxDuration = 30; // seconds
+
 export async function POST(req: Request) {
   try {
+    // Rate limiting: 5 requests per minute per IP
+    const ip = getClientIp(req);
+    const rateLimitResult = rateLimit(ip, 5, 60 * 1000);
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(
+        { error: "Trop de requêtes", details: "Limite de 5 requêtes par minute atteinte" },
+        { status: 429, headers: { "Retry-After": String(Math.ceil((rateLimitResult.retryAfterMs ?? 60000) / 1000)) } }
+      );
+    }
+
+    // Content-length check (max 50 KB)
+    const contentLength = req.headers.get("content-length");
+    if (contentLength && parseInt(contentLength, 10) > 50 * 1024) {
+      return NextResponse.json(
+        { error: "Payload trop volumineux", details: "La taille maximale est de 50 Ko" },
+        { status: 413 }
+      );
+    }
+
     const body = await req.json();
     const profile: UserProfile = body.profile;
+
+    // Validate profile with zod
+    const profileResult = UserProfileSchema.safeParse(profile);
+    if (!profileResult.success) {
+      return NextResponse.json(
+        { error: "Profil invalide", details: profileResult.error.format() },
+        { status: 400 }
+      );
+    }
+    // Use validated profile (type-safe)
+    const validatedProfile = profileResult.data;
+
+    // Validate alreadySuggestedGiftTitles
+    const rawAlreadySuggested = body.alreadySuggestedGiftTitles;
+    const alreadySuggestedGiftTitles: string[] = [];
+    if (rawAlreadySuggested !== undefined) {
+      const result = AlreadySuggestedGiftTitlesSchema.safeParse(rawAlreadySuggested);
+      if (!result.success) {
+        return NextResponse.json(
+          { error: "alreadySuggestedGiftTitles invalide", details: result.error.format() },
+          { status: 400 }
+        );
+      }
+      alreadySuggestedGiftTitles.push(...result.data);
+    }
 
     const rawProvider = body.provider;
     if (rawProvider !== undefined && rawProvider !== "google" && rawProvider !== "groq") {
@@ -32,7 +80,6 @@ export async function POST(req: Request) {
     }
     const provider: Provider = rawProvider === "groq" ? "groq" : "google";
 
-    const alreadySuggestedGiftTitles: string[] = body.alreadySuggestedGiftTitles || [];
     const modelName: string = body.model || "gemini-2.0-flash-exp";
 
     if (typeof modelName !== "string" || modelName.trim().length === 0) {
@@ -64,8 +111,8 @@ export async function POST(req: Request) {
       );
     }
 
-    const blacklistLabels: string[] = Array.isArray(profile.blacklist)
-      ? profile.blacklist.map((t) => t.label)
+    const blacklistLabels: string[] = Array.isArray(validatedProfile.blacklist)
+      ? validatedProfile.blacklist.map((t) => t.label)
       : [];
 
     const systemPrompt = buildGiftSystemPrompt({
@@ -73,7 +120,7 @@ export async function POST(req: Request) {
       blacklistLabels,
     });
 
-    const userMessage = buildGiftUserMessage(profile);
+    const userMessage = buildGiftUserMessage(validatedProfile);
 
     async function callLLMAndValidate(): Promise<{ gift_ideas: Record<string, unknown>[]; rawText: string }> {
       let lastRawText = "";
@@ -118,10 +165,20 @@ export async function POST(req: Request) {
 
           const result = await model.generateContent({ contents });
           rawText = result.response.text();
-          // finishReason Google
+          // finishReason + usage Google
           try {
             const candidates = (result.response as unknown as { candidates?: Array<{ finishReason?: string }> }).candidates;
             finishReason = candidates?.[0]?.finishReason;
+          } catch {
+            // ignore
+          }
+          try {
+            const usageMeta = (result.response as unknown as { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number } }).usageMetadata;
+            if (usageMeta) {
+              console.log(
+                `[generate-gifts] Google usage: prompt=${usageMeta.promptTokenCount ?? "?"} candidates=${usageMeta.candidatesTokenCount ?? "?"} total=${usageMeta.totalTokenCount ?? "?"}`
+              );
+            }
           } catch {
             // ignore
           }
@@ -180,6 +237,11 @@ export async function POST(req: Request) {
           }
           rawText = completion.choices[0]?.message?.content;
           finishReason = (completion.choices[0] as unknown as { finish_reason?: string })?.finish_reason;
+          if (completion.usage) {
+            console.log(
+              `[generate-gifts] Groq usage: prompt=${completion.usage.prompt_tokens ?? "?"} completion=${completion.usage.completion_tokens ?? "?"} total=${completion.usage.total_tokens ?? "?"}`
+            );
+          }
           if (!rawText) {
             throw new Error("Reponse vide du LLM (Groq)");
           }

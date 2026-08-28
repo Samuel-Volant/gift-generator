@@ -8,9 +8,29 @@ import {
   TAG_SUGGESTION_JSON_SCHEMA,
   buildTagSuggestionPrompt,
 } from "@/lib/prompts/tag-suggestion";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
   try {
+    // Rate limiting: 10 requests per minute per IP
+    const ip = getClientIp(req);
+    const rateLimitResult = rateLimit(ip, 10, 60 * 1000);
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(
+        { error: "Trop de requêtes", details: "Limite de 10 requêtes par minute atteinte" },
+        { status: 429, headers: { "Retry-After": String(Math.ceil((rateLimitResult.retryAfterMs ?? 60000) / 1000)) } }
+      );
+    }
+
+    // Content-length check (max 50 KB)
+    const contentLength = req.headers.get("content-length");
+    if (contentLength && parseInt(contentLength, 10) > 50 * 1024) {
+      return NextResponse.json(
+        { error: "Payload trop volumineux", details: "La taille maximale est de 50 Ko" },
+        { status: 413 }
+      );
+    }
+
     const {
       currentTags,
       sliders,

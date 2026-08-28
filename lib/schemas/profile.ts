@@ -28,12 +28,12 @@ export type BudgetFields = z.infer<typeof BudgetFieldsSchema>;
 
 const TagSchema = z.object({
   id: z.string(),
-  label: z.string(),
+  label: z.string().min(1).max(50),
 });
 
 const InterestSchema = z.object({
   id: z.string(),
-  label: z.string(),
+  label: z.string().min(1).max(50),
   level: z.enum(["casual", "expert"]),
 });
 
@@ -52,7 +52,7 @@ export const RelationSchema = z.enum(["ami", "famille", "collegue", "partenaire"
 export const UserProfileSchema = z
   .object({
     userId: z.string().optional(),
-    age: z.number().min(0).max(120),
+    age: z.number().int().min(0).max(120),
     genre: GenreSchema,
     relation: RelationSchema,
     pragmatiqueSentimental: z.number().min(0).max(100),
@@ -60,14 +60,14 @@ export const UserProfileSchema = z
     calmeEnergie: z.number().min(0).max(100),
     serieuxFun: z.number().min(0).max(100),
     objetExperience: z.number().min(0).max(100),
-    interets: z.array(InterestSchema),
-    momentDeVie: z.array(TagSchema),
-    roleGroupe: z.array(TagSchema),
-    marquesTotem: z.array(TagSchema),
+    interets: z.array(InterestSchema).max(20),
+    momentDeVie: z.array(TagSchema).max(20),
+    roleGroupe: z.array(TagSchema).max(20),
+    marquesTotem: z.array(TagSchema).max(20),
     profilAcheteur: BuyerProfileSchema,
-    projets: z.array(TagSchema),
-    plaintes: z.array(TagSchema),
-    blacklist: z.array(TagSchema),
+    projets: z.array(TagSchema).max(20),
+    plaintes: z.array(TagSchema).max(20),
+    blacklist: z.array(TagSchema).max(20),
     budget: BudgetSchema,
     budgetMin: BudgetMinSchema,
     budgetMax: BudgetMaxSchema,
@@ -99,3 +99,5 @@ export const GiftIdeaStorageSchema = z.object({
 });
 
 export const GiftIdeasStorageSchema = z.array(GiftIdeaStorageSchema);
+
+export const AlreadySuggestedGiftTitlesSchema = z.array(z.string().max(100)).max(50);
