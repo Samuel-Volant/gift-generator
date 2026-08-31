@@ -12,8 +12,8 @@ import {
 } from "./ai-models";
 
 describe("ai-models constants", () => {
-  it("FALLBACK_MODELS contient 2 modeles gratuits", () => {
-    expect(FALLBACK_MODELS.length).toBe(2);
+  it("FALLBACK_MODELS contient 3 modeles gratuits", () => {
+    expect(FALLBACK_MODELS.length).toBe(3);
     expect(FALLBACK_MODELS.every((m) => m.name.includes("Gratuit"))).toBe(true);
   });
 
@@ -22,8 +22,10 @@ describe("ai-models constants", () => {
   });
 
   it("GOOGLE_FREE_ALLOWLIST contient les modeles gratuits verifies", () => {
+    expect(GOOGLE_FREE_ALLOWLIST).toContain("gemini-2.5-flash");
     expect(GOOGLE_FREE_ALLOWLIST).toContain("gemini-2.0-flash");
-    expect(GOOGLE_FREE_ALLOWLIST).toContain("gemini-1.5-flash");
+    expect(GOOGLE_FREE_ALLOWLIST).toContain("gemini-2.5-flash-lite");
+    expect(GOOGLE_FREE_ALLOWLIST).toContain("gemini-3-flash-preview");
     expect(GOOGLE_FREE_ALLOWLIST).toContain("gemma-3-27b");
   });
 
@@ -31,7 +33,7 @@ describe("ai-models constants", () => {
     expect(GOOGLE_DENYLIST_RE.test("tts-model")).toBe(true);
     expect(GOOGLE_DENYLIST_RE.test("text-embedding-004")).toBe(true);
     expect(GOOGLE_DENYLIST_RE.test("gemini-vision")).toBe(true);
-    expect(GOOGLE_DENYLIST_RE.test("gemini-2.0-flash")).toBe(false);
+    expect(GOOGLE_DENYLIST_RE.test("gemini-2.5-flash")).toBe(false);
   });
 
   it("GROQ_DENYLIST exclut whisper/compound/playai/guard", () => {
@@ -46,17 +48,20 @@ describe("ai-models constants", () => {
 });
 
 describe("isGoogleModelAllowed", () => {
+  it("allowlist: gemini-2.5-flash + variants", () => {
+    expect(isGoogleModelAllowed("gemini-2.5-flash", ["generateContent"])).toBe(true);
+    expect(isGoogleModelAllowed("gemini-2.5-flash-001", ["generateContent"])).toBe(true);
+    expect(isGoogleModelAllowed("gemini-2.5-flash-lite", ["generateContent"])).toBe(true);
+  });
+
   it("allowlist: gemini-2.0-flash + variants", () => {
     expect(isGoogleModelAllowed("gemini-2.0-flash", ["generateContent"])).toBe(true);
     expect(isGoogleModelAllowed("gemini-2.0-flash-exp", ["generateContent"])).toBe(true);
     expect(isGoogleModelAllowed("gemini-2.0-flash-001", ["generateContent"])).toBe(true);
-    expect(isGoogleModelAllowed("gemini-2.0-flash-lite", ["generateContent"])).toBe(true);
   });
 
-  it("allowlist: gemini-1.5-flash variants", () => {
-    expect(isGoogleModelAllowed("gemini-1.5-flash", ["generateContent"])).toBe(true);
-    expect(isGoogleModelAllowed("gemini-1.5-flash-8b", ["generateContent"])).toBe(true);
-    expect(isGoogleModelAllowed("gemini-1.5-flash-001", ["generateContent"])).toBe(true);
+  it("allowlist: gemini-3-flash-preview", () => {
+    expect(isGoogleModelAllowed("gemini-3-flash-preview", ["generateContent"])).toBe(true);
   });
 
   it("allowlist: gemma-3 variants", () => {
@@ -66,29 +71,25 @@ describe("isGoogleModelAllowed", () => {
   });
 
   it("rejette modeles hors allowlist meme avec flash", () => {
-    // gemini-2.5-flash not in initial allowlist -> should be false unless fallback pricing
-    expect(isGoogleModelAllowed("gemini-2.5-flash", ["generateContent"])).toBe(false);
     expect(isGoogleModelAllowed("gemini-1.0-pro", ["generateContent"])).toBe(false);
     expect(isGoogleModelAllowed("gemini-pro", ["generateContent"])).toBe(false);
   });
 
   it("rejette si generateContent manquant", () => {
-    expect(isGoogleModelAllowed("gemini-2.0-flash", ["embedContent"])).toBe(false);
-    expect(isGoogleModelAllowed("gemini-2.0-flash", [])).toBe(false);
-    expect(isGoogleModelAllowed("gemini-2.0-flash", undefined)).toBe(false);
+    expect(isGoogleModelAllowed("gemini-2.5-flash", ["embedContent"])).toBe(false);
+    expect(isGoogleModelAllowed("gemini-2.5-flash", [])).toBe(false);
+    expect(isGoogleModelAllowed("gemini-2.5-flash", undefined)).toBe(false);
   });
 
   it("rejette denylist meme si allowlist match", () => {
-    expect(isGoogleModelAllowed("gemini-2.0-flash-tts", ["generateContent"])).toBe(false);
+    expect(isGoogleModelAllowed("gemini-2.5-flash-tts", ["generateContent"])).toBe(false);
     expect(isGoogleModelAllowed("gemini-embedding-exp", ["generateContent"])).toBe(false);
     expect(isGoogleModelAllowed("gemini-vision-flash", ["generateContent"])).toBe(false);
   });
 
   it("fallback pricing: inclut si inputTokenPrice == 0 meme hors allowlist", () => {
-    // Ici on verifie que l'helper avec raw free price retourne true
-    expect(isGoogleModelAllowed("gemini-2.5-flash", ["generateContent"], { inputTokenPrice: 0 } as unknown)).toBe(true);
     expect(isGoogleModelAllowed("unknown-free-model", ["generateContent"], { inputTokenPrice: 0 } as unknown)).toBe(true);
-    expect(isGoogleModelAllowed("gemini-2.5-flash", ["generateContent"], { inputTokenPrice: 0.01 } as unknown)).toBe(false);
+    expect(isGoogleModelAllowed("unknown-free-model", ["generateContent"], { inputTokenPrice: 0.01 } as unknown)).toBe(false);
   });
 });
 
@@ -120,21 +121,31 @@ describe("isGroqModelAllowed", () => {
 describe("filterGoogleModels", () => {
   it("filtre et mappe modeles Google bruts", () => {
     const raw = [
+      { name: "models/gemini-2.5-flash", displayName: "Gemini 2.5 Flash", supportedGenerationMethods: ["generateContent"] },
       { name: "models/gemini-2.0-flash", displayName: "Gemini 2.0 Flash", supportedGenerationMethods: ["generateContent"] },
-      { name: "models/gemini-1.5-flash-8b", displayName: "Gemini 1.5 Flash 8B", supportedGenerationMethods: ["generateContent"] },
       { name: "models/gemma-3-27b-it", displayName: "Gemma 3 27B", supportedGenerationMethods: ["generateContent"] },
       { name: "models/gemini-pro", displayName: "Gemini Pro", supportedGenerationMethods: ["generateContent"] },
       { name: "models/text-embedding-004", displayName: "Embedding", supportedGenerationMethods: ["embedContent"] },
-      { name: "models/gemini-2.0-flash-tts", displayName: "TTS", supportedGenerationMethods: ["generateContent"] },
+      { name: "models/gemini-2.5-flash-tts", displayName: "TTS", supportedGenerationMethods: ["generateContent"] },
     ];
     const result = filterGoogleModels(raw);
     expect(result.map((m) => m.id)).toEqual([
+      "gemini-2.5-flash",
       "gemini-2.0-flash",
-      "gemini-1.5-flash-8b",
       "gemma-3-27b-it",
     ]);
     expect(result.every((m) => m.provider === "google")).toBe(true);
     expect(result.every((m) => m.name.includes("Gratuit"))).toBe(true);
+  });
+
+  it("gere supportedActions (proxy API) en plus de supportedGenerationMethods", () => {
+    const raw = [
+      { name: "models/gemini-2.5-flash", displayName: "Gemini 2.5 Flash", supportedActions: ["generateContent"] },
+      { name: "models/gemini-2.0-flash", displayName: "Gemini 2.0 Flash", supportedGenerationMethods: ["generateContent"] },
+    ];
+    const result = filterGoogleModels(raw);
+    expect(result).toHaveLength(2);
+    expect(result.map((m) => m.id)).toEqual(["gemini-2.5-flash", "gemini-2.0-flash"]);
   });
 
   it("deduplication par id", () => {

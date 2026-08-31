@@ -11,7 +11,7 @@ async function fetchGoogleModels(): Promise<AIModel[]> {
 
   try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}&pageSize=100`,
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}&pageSize=1000`,
     )
     if (!res.ok) return []
 

@@ -9,13 +9,18 @@ export interface AIModel {
 // Utilisé uniquement si l'appel à /api/models échoue (ex: hors-ligne, clés API absentes)
 export const FALLBACK_MODELS: AIModel[] = [
     {
-        id: "gemini-2.0-flash-exp",
+        id: "gemini-2.5-flash",
+        name: "✨ Gemini 2.5 Flash (Google · Gratuit)",
+        provider: "google",
+    },
+    {
+        id: "gemini-2.0-flash",
         name: "✨ Gemini 2.0 Flash (Google · Gratuit)",
         provider: "google",
     },
     {
-        id: "llama-3.1-8b-instant",
-        name: "🦙 Llama 3.1 8B Instant (Groq · Gratuit)",
+        id: "llama-3.3-70b-versatile",
+        name: "🦙 Llama 3.3 70B Versatile (Groq · Gratuit)",
         provider: "groq",
     },
 ]
@@ -27,14 +32,28 @@ export const DEFAULT_MODEL = FALLBACK_MODELS[0].id
 // ---------------------------------------------------------------------------
 
 /**
- * Allowlist des modèles Google réellement gratuits.
+ * Allowlist des modèles Google réellement gratuits (tier gratuit AI Studio / Developer API).
  * Préfixe : toute variante avec suffixe (-exp, -001, -8b, -lite, -it) est acceptée.
  * À maintenir quand Google publie de nouveaux paliers gratuits.
+ *
+ * Sources :
+ * - https://ai.google.dev/pricing (free tier limits)
+ * - https://ai.google.dev/gemini-api/docs/models (active models)
+ * - gemini-2.0-flash, 2.5-flash, 2.5-flash-lite, 3-flash-preview, 3.1-flash-lite-preview, 3.5-flash ont un tier gratuit
+ * - gemma-3-* / gemma-4-* ont un tier gratuit
+ * - gemini-2.0-flash-lite est retiré (juin 2026), gemini-1.5-flash est déprécié
  */
 export const GOOGLE_FREE_ALLOWLIST: string[] = [
+    "gemini-2.5-flash",
     "gemini-2.0-flash",
-    "gemini-1.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-3-flash-preview",
+    "gemini-3.1-flash-lite-preview",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
     "gemma-3-27b",
+    "gemma-4-31b-it",
+    "gemma-4-26b-a4b-it",
 ]
 
 /**
@@ -68,7 +87,7 @@ function hasFreePricing(raw: unknown): boolean {
 /**
  * Détermine si un modèle Google est autorisé (gratuit vérifié).
  * @param id - id normalisé sans préfixe "models/"
- * @param methods - supportedGenerationMethods
+ * @param methods - supportedGenerationMethods ou supportedActions
  * @param raw - objet brut optionnel pour vérifier pricing gratuit fallback
  */
 export function isGoogleModelAllowed(
@@ -114,7 +133,11 @@ export function filterGoogleModels(rawModels: unknown): AIModel[] {
         if (!m || typeof m !== "object") continue
         const rawName = (m["name"] as string) || ""
         const id = rawName.replace("models/", "")
-        const methods = (m["supportedGenerationMethods"] as string[]) || []
+        // Google API utilise `supportedGenerationMethods`, certains proxy utilisent `supportedActions`
+        const methods =
+            (m["supportedGenerationMethods"] as string[]) ||
+            (m["supportedActions"] as string[]) ||
+            []
         const displayName = (m["displayName"] as string) || id
 
         if (!isGoogleModelAllowed(id, methods, m)) continue
