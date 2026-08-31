@@ -28,16 +28,32 @@ function makeProfile(overrides: Partial<UserProfile> = {}): UserProfile {
 
 describe("buildGiftSystemPrompt", () => {
   it("contient GiftGenius, blacklist, et déjà suggérés échappés", () => {
-    const prompt = buildGiftSystemPrompt({ alreadySuggestedTitles: ["A & B"], blacklistLabels: ["<Alcool>"] });
+    const prompt = buildGiftSystemPrompt({ alreadySuggestedTitles: ["A & B"], blacklistLabels: ["<Alcool>"], deletedGiftTitles: [] });
     expect(prompt).toContain("GiftGenius");
     expect(prompt).toContain("&lt;Alcool&gt;");
     expect(prompt).toContain("A &amp; B");
     expect(prompt).not.toContain("JSON_FORMAT_INSTRUCTION");
   });
   it("mentionne 1 max SAVOIR et archétypes", () => {
-    const p = buildGiftSystemPrompt({ alreadySuggestedTitles: [], blacklistLabels: [] });
+    const p = buildGiftSystemPrompt({ alreadySuggestedTitles: [], blacklistLabels: [], deletedGiftTitles: [] });
     expect(p).toContain("SAVOIR");
     expect(p).toContain("archétypes");
+  });
+  it("injecte les cartes supprimées en catégorie: titre, échappées tailles", () => {
+    const p = buildGiftSystemPrompt({
+      alreadySuggestedTitles: [],
+      blacklistLabels: [],
+      deletedGiftTitles: ["Offres: Abonnement box énigmes", "Vêtements: Pull <chaud>"],
+    });
+    expect(p).toContain("Toutes les cartes supprimées");
+    expect(p).toContain("Offres: Abonnement box énigmes");
+    expect(p).not.toContain("<chaud>"); // échappé
+    expect(p).toContain("&lt;chaud&gt;");
+  });
+  it("n'injecte pas le bloc si aucune carte supprimée", () => {
+    const p = buildGiftSystemPrompt({ alreadySuggestedTitles: ["A"], blacklistLabels: [], deletedGiftTitles: [] });
+    expect(p).not.toContain("Toutes les cartes supprimées");
+    expect(p).not.toContain("cartes supprimées");
   });
 });
 

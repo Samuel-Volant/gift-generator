@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef, useEffect } from "react";
 import { useLocalStorage } from "./use-local-storage";
-import { STORAGE_KEYS, dedupeAndLimitTitles, clearGiftGeneratorStorage } from "@/lib/storage";
+import { STORAGE_KEYS, dedupeAndLimitTitles, dedupeGiftsById, clearGiftGeneratorStorage } from "@/lib/storage";
 import { mergeGiftResults } from "@/lib/gift-ordering";
-import { UserProfileSchema, GiftIdeasStorageSchema } from "@/lib/schemas/profile";
-import type { UserProfile, GiftIdea } from "@/types";
+import { UserProfileSchema, GiftIdeasStorageSchema, DeletedGiftsStorageSchema } from "@/lib/schemas/profile";
+import type { UserProfile, GiftIdea, DeletedGift } from "@/types";
 import { z } from "zod";
 
 export const DEFAULT_PROFILE: UserProfile = {
@@ -57,7 +57,19 @@ export function usePersistedProfile() {
     { validator: AlreadySuggestedSchema },
   );
 
-  const isHydrated = isProfileHydrated && isGiftsHydrated && isSuggestedHydrated;
+  const [deletedGifts, setDeletedGifts, isDeletedHydrated] = useLocalStorage<DeletedGift[]>(
+    STORAGE_KEYS.deletedGifts,
+    [],
+    { validator: DeletedGiftsStorageSchema },
+  );
+
+  // Ref pour accéder à deletedGifts dans restoreDeletedGift sans stale closure
+  const deletedGiftsRef = useRef(deletedGifts);
+  useEffect(() => {
+    deletedGiftsRef.current = deletedGifts;
+  });
+
+  const isHydrated = isProfileHydrated && isGiftsHydrated && isSuggestedHydrated && isDeletedHydrated;
 
   const addSuggestedTitles = useCallback(
     (newTitles: string[]) => {
@@ -93,17 +105,50 @@ export function usePersistedProfile() {
     [setGiftResults],
   );
 
+  /**
+   * Archive les cartes supprimées (dismiss + nettoyage) avec timestamp.
+   * Préfixe les plus récents, déduplique par id (retire l'ancienne occurrence si re-dismiss après restore).
+   * Pas de limite — la collection vit tant que le profil vit (issue #26).
+   */
+  const addDeletedGifts = useCallback(
+    (gifts: GiftIdea[]) => {
+      if (gifts.length === 0) return;
+      const now = Date.now();
+      const newDeleted: DeletedGift[] = gifts.map((g, i) => ({ ...g, dismissedAt: now + i }));
+      setDeletedGifts((prev) => dedupeGiftsById([...newDeleted, ...prev]));
+    },
+    [setDeletedGifts],
+  );
+
+  const restoreDeletedGift = useCallback(
+    (giftId: string) => {
+      // On utilise un pattern fonctionnel pour accéder à l'état le plus récent
+      // sans dépendre de la closure potentiellement stale
+      setDeletedGifts((prev) => {
+        const target = prev.find((g) => g.id === giftId);
+        if (target) {
+          // Réinsère la carte dans le grid, en haut de liste (ordre existant)
+          const { dismissedAt: _dismissedAt, ...gift } = target;
+          setGiftResults((giftResults) => mergeGiftResults(giftResults, [gift]));
+        }
+        return prev.filter((g) => g.id !== giftId);
+      });
+    },
+    [setDeletedGifts, setGiftResults],
+  );
+
   const clearAll = useCallback(() => {
     setProfile(DEFAULT_PROFILE);
     setGiftResults([]);
     setAlreadySuggestedTitles([]);
+    setDeletedGifts([]);
     // also clear raw storage to ensure no stale keys if hooks race
     try {
       clearGiftGeneratorStorage();
     } catch {
       // silent
     }
-  }, [setProfile, setGiftResults, setAlreadySuggestedTitles]);
+  }, [setProfile, setGiftResults, setAlreadySuggestedTitles, setDeletedGifts]);
 
   const resetProfileOnly = useCallback(() => {
     setProfile(DEFAULT_PROFILE);
@@ -117,16 +162,21 @@ export function usePersistedProfile() {
       setGiftResults,
       alreadySuggestedTitles,
       setAlreadySuggestedTitles,
+      deletedGifts,
+      setDeletedGifts,
       addSuggestedTitles,
       appendGifts,
       dismissGift,
       dismissNonFavorites,
+      addDeletedGifts,
+      restoreDeletedGift,
       clearAll,
       resetProfileOnly,
       isHydrated,
       isProfileHydrated,
       isGiftsHydrated,
       isSuggestedHydrated,
+      isDeletedHydrated,
     }),
     [
       profile,
@@ -135,16 +185,21 @@ export function usePersistedProfile() {
       setGiftResults,
       alreadySuggestedTitles,
       setAlreadySuggestedTitles,
+      deletedGifts,
+      setDeletedGifts,
       addSuggestedTitles,
       appendGifts,
       dismissGift,
       dismissNonFavorites,
+      addDeletedGifts,
+      restoreDeletedGift,
       clearAll,
       resetProfileOnly,
       isHydrated,
       isProfileHydrated,
       isGiftsHydrated,
       isSuggestedHydrated,
+      isDeletedHydrated,
     ],
   );
 }

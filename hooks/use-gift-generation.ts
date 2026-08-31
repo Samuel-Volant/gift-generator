@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { usePersistedProfile } from "@/hooks/use-persisted-profile";
 import { validateBudgetRange } from "@/lib/prompts/helpers";
+import { formatDeletedGiftTitles } from "@/lib/prompts/helpers";
 import { useToast } from "@/hooks/use-toast";
 import type { Tag } from "@/types";
 
@@ -21,6 +22,9 @@ export function useGiftGeneration({ selectedModel, selectedProvider }: UseGiftGe
     appendGifts,
     dismissGift,
     dismissNonFavorites,
+    deletedGifts,
+    addDeletedGifts,
+    restoreDeletedGift,
     alreadySuggestedTitles,
     setAlreadySuggestedTitles,
     clearAll,
@@ -38,6 +42,7 @@ export function useGiftGeneration({ selectedModel, selectedProvider }: UseGiftGe
     setIsLoading(true);
     try {
       const alreadySuggestedGiftTitles = alreadySuggestedTitles;
+      const deletedGiftTitles = formatDeletedGiftTitles(deletedGifts);
 
       const response = await fetch("/api/generate-gifts", {
         method: "POST",
@@ -45,6 +50,7 @@ export function useGiftGeneration({ selectedModel, selectedProvider }: UseGiftGe
         body: JSON.stringify({
           profile,
           alreadySuggestedGiftTitles,
+          deletedGiftTitles,
           model: selectedModel,
           provider: selectedProvider,
         }),
@@ -76,7 +82,7 @@ export function useGiftGeneration({ selectedModel, selectedProvider }: UseGiftGe
     } finally {
       setIsLoading(false);
     }
-  }, [budgetError, isLoading, profile, alreadySuggestedTitles, selectedModel, selectedProvider, appendGifts, toast]);
+  }, [budgetError, isLoading, profile, alreadySuggestedTitles, deletedGifts, selectedModel, selectedProvider, appendGifts, toast]);
 
   const handleDismissGift = useCallback(
     (giftId: string, blacklistTag?: string) => {
@@ -92,20 +98,24 @@ export function useGiftGeneration({ selectedModel, selectedProvider }: UseGiftGe
           return { ...prev, blacklist: [...prev.blacklist, newTag] };
         });
       }
+      const dismissed = giftResults.find((g) => g.id === giftId);
+      if (dismissed) addDeletedGifts([dismissed]);
       dismissGift(giftId);
     },
-    [setProfile, dismissGift],
+    [setProfile, giftResults, addDeletedGifts, dismissGift],
   );
 
   const handleDismissNonFavorites = useCallback(
     (favoriteIds: string[]) => {
+      const removed = giftResults.filter((g) => !favoriteIds.includes(g.id));
+      if (removed.length > 0) addDeletedGifts(removed);
       dismissNonFavorites(favoriteIds);
       toast({
         title: "Cartes nettoyées",
         description: "Toutes les cartes non favorites ont été supprimées.",
       });
     },
-    [dismissNonFavorites, toast],
+    [giftResults, addDeletedGifts, dismissNonFavorites, toast],
   );
 
   const handleRemoveSuggestedTitle = useCallback(
@@ -123,17 +133,30 @@ export function useGiftGeneration({ selectedModel, selectedProvider }: UseGiftGe
     });
   }, [clearAll, toast]);
 
+  const handleRestoreDeletedGift = useCallback(
+    (giftId: string) => {
+      restoreDeletedGift(giftId);
+      toast({
+        title: "Carte restaurée",
+        description: "La carte a été réinsérée dans la grille.",
+      });
+    },
+    [restoreDeletedGift, toast],
+  );
+
   return {
     profile,
     setProfile,
     giftResults,
     alreadySuggestedTitles,
+    deletedGifts,
     isLoading,
     budgetError,
     handleGenerateGifts,
     handleDismissGift,
     handleDismissNonFavorites,
     handleRemoveSuggestedTitle,
+    handleRestoreDeletedGift,
     handleReset,
     clearAll,
     isHydrated,

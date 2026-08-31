@@ -17,7 +17,8 @@ import { GiftCardSkeleton } from "@/components/gifts/gift-card-skeleton";
 import { GiftFilters, isInSelectedRange } from "@/components/gifts/gift-filters";
 import { PromptPreview } from "@/components/gifts/prompt-preview";
 import { SuggestedHistory } from "@/components/gifts/suggested-history";
-import type { GiftIdea, UserProfile } from "@/types";
+import { DeletedGiftsDialog } from "@/components/gifts/deleted-gifts-dialog";
+import type { GiftIdea, UserProfile, DeletedGift } from "@/types";
 
 interface GiftResultsProps {
   gifts: GiftIdea[];
@@ -30,11 +31,13 @@ interface GiftResultsProps {
   onDismiss: (giftId: string, blacklistTag?: string) => void;
   onDismissNonFavorites?: (favoriteIds: string[]) => void;
   onRemoveSuggestedTitle?: (title: string) => void;
+  onRestoreDeletedGift?: (giftId: string) => void;
   profile: UserProfile;
   alreadySuggestedTitles: string[];
+  deletedGifts?: DeletedGift[];
 }
 
-export function GiftResults({ gifts, isLoading, budgetError, favorites, onToggleFavorite, onGenerateMore, onGenerateFirst, onDismiss, onDismissNonFavorites, onRemoveSuggestedTitle, profile, alreadySuggestedTitles }: GiftResultsProps) {
+export function GiftResults({ gifts, isLoading, budgetError, favorites, onToggleFavorite, onGenerateMore, onGenerateFirst, onDismiss, onDismissNonFavorites, onRemoveSuggestedTitle, onRestoreDeletedGift, profile, alreadySuggestedTitles, deletedGifts = [] }: GiftResultsProps) {
   const [selectedArchetypes, setSelectedArchetypes] = useState<string[]>([]);
   const [selectedPriceRanges, setSelectedPriceRanges] = useState<string[]>([]);
   const [showDeleteNonFavoritesDialog, setShowDeleteNonFavoritesDialog] = useState(false);
@@ -68,8 +71,9 @@ export function GiftResults({ gifts, isLoading, budgetError, favorites, onToggle
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold text-balance">Idées Cadeaux Personnalisées</h2>
           <div className="flex items-center gap-2">
-            <PromptPreview profile={profile} alreadySuggestedTitles={alreadySuggestedTitles} />
+            <PromptPreview profile={profile} alreadySuggestedTitles={alreadySuggestedTitles} deletedGifts={deletedGifts} />
             <SuggestedHistory titles={alreadySuggestedTitles} onRemoveTitle={(t) => onRemoveSuggestedTitle?.(t)} />
+            <DeletedGiftsDialog gifts={deletedGifts} onRestore={(id) => onRestoreDeletedGift?.(id)} />
             {gifts.length > 0 && hasNonFavorites && (
               <Button
                 onClick={() => setShowDeleteNonFavoritesDialog(true)}
@@ -169,9 +173,10 @@ export function GiftResults({ gifts, isLoading, budgetError, favorites, onToggle
           </>
         </Button>
         <div className="pt-2">
-          <PromptPreview profile={profile} alreadySuggestedTitles={alreadySuggestedTitles} />
-          <div className="mt-2 flex justify-center">
+          <PromptPreview profile={profile} alreadySuggestedTitles={alreadySuggestedTitles} deletedGifts={deletedGifts} />
+          <div className="mt-2 flex justify-center gap-2">
             <SuggestedHistory titles={alreadySuggestedTitles} onRemoveTitle={(t) => onRemoveSuggestedTitle?.(t)} />
+            <DeletedGiftsDialog gifts={deletedGifts} onRestore={(id) => onRestoreDeletedGift?.(id)} />
           </div>
         </div>
       </CardContent>

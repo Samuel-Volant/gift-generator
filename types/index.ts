@@ -83,6 +83,11 @@ export interface GiftIdea {
   archetype?: string
 }
 
+/** Carte supprimée par l'utilisateur — persiste en localStorage (#26). */
+export interface DeletedGift extends GiftIdea {
+  dismissedAt: number
+}
+
 export interface SavedProfile {
   id: string
   name: string

@@ -101,4 +101,13 @@ export const GiftIdeaStorageSchema = z.object({
 
 export const GiftIdeasStorageSchema = z.array(GiftIdeaStorageSchema);
 
+export const DeletedGiftStorageSchema = GiftIdeaStorageSchema.extend({
+  dismissedAt: z.number(),
+});
+
+export const DeletedGiftsStorageSchema = z.array(DeletedGiftStorageSchema);
+
 export const AlreadySuggestedGiftTitlesSchema = z.array(z.string().max(100)).max(50);
+
+/** Liste des cartes supprimées formatée pour le prompt — catégorie: titre (issue #26). */
+export const DeletedGiftTitlesSchema = z.array(z.string().min(1).max(300)).max(1000);

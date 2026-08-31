@@ -9,6 +9,7 @@ export const STORAGE_KEYS = {
   gifts: "giftgen:gifts",
   alreadySuggested: "giftgen:alreadySuggested",
   favorites: "giftgen:favorites",
+  deletedGifts: "giftgen:deletedGifts",
 } as const;
 
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS] | string;
@@ -114,4 +115,19 @@ export function dedupeAndLimitTitles(titles: string[], limit = 30): string[] {
   }
   if (deduped.length <= limit) return deduped;
   return deduped.slice(deduped.length - limit);
+}
+
+/**
+ * Déduplique une liste d'objets par `id` — garde la première occurrence (cartes supprimées #26).
+ */
+export function dedupeGiftsById<T extends { id: string }>(items: T[]): T[] {
+  const seen = new Set<string>();
+  const deduped: T[] = [];
+  for (const item of items) {
+    if (!seen.has(item.id)) {
+      seen.add(item.id);
+      deduped.push(item);
+    }
+  }
+  return deduped;
 }

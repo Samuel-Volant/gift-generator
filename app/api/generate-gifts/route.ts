@@ -13,7 +13,7 @@ import {
   GIFT_FEW_SHOT,
 } from "@/lib/prompts/gift-generation";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
-import { UserProfileSchema, AlreadySuggestedGiftTitlesSchema } from "@/lib/schemas/profile";
+import { UserProfileSchema, AlreadySuggestedGiftTitlesSchema, DeletedGiftTitlesSchema } from "@/lib/schemas/profile";
 
 function truncateForLog(text: string, max = 500): string {
   if (text.length <= max) return text;
@@ -71,6 +71,20 @@ export async function POST(req: Request) {
       alreadySuggestedGiftTitles.push(...result.data);
     }
 
+    // Validate deletedGiftTitles (issue #26)
+    const rawDeletedGiftTitles = body.deletedGiftTitles;
+    const deletedGiftTitles: string[] = [];
+    if (rawDeletedGiftTitles !== undefined) {
+      const result = DeletedGiftTitlesSchema.safeParse(rawDeletedGiftTitles);
+      if (!result.success) {
+        return NextResponse.json(
+          { error: "deletedGiftTitles invalide", details: result.error.format() },
+          { status: 400 }
+        );
+      }
+      deletedGiftTitles.push(...result.data);
+    }
+
     const rawProvider = body.provider;
     if (rawProvider !== undefined && rawProvider !== "google" && rawProvider !== "groq") {
       return NextResponse.json(
@@ -118,6 +132,7 @@ export async function POST(req: Request) {
     const systemPrompt = buildGiftSystemPrompt({
       alreadySuggestedTitles: alreadySuggestedGiftTitles,
       blacklistLabels,
+      deletedGiftTitles,
     });
 
     const userMessage = buildGiftUserMessage(validatedProfile);

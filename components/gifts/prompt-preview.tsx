@@ -13,18 +13,21 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { buildGiftSystemPrompt, buildGiftUserMessage } from "@/lib/prompts/gift-generation";
-import type { UserProfile } from "@/types";
+import { formatDeletedGiftTitles } from "@/lib/prompts/helpers";
+import type { UserProfile, DeletedGift } from "@/types";
 
 interface PromptPreviewProps {
   profile: UserProfile;
   alreadySuggestedTitles: string[];
+  deletedGifts?: DeletedGift[];
 }
 
-export function PromptPreview({ profile, alreadySuggestedTitles }: PromptPreviewProps) {
+export function PromptPreview({ profile, alreadySuggestedTitles, deletedGifts = [] }: PromptPreviewProps) {
   const [copied, setCopied] = useState(false);
 
   const blacklistLabels = profile.blacklist.map((t) => t.label);
-  const systemPrompt = buildGiftSystemPrompt({ alreadySuggestedTitles, blacklistLabels });
+  const deletedGiftTitles = formatDeletedGiftTitles(deletedGifts);
+  const systemPrompt = buildGiftSystemPrompt({ alreadySuggestedTitles, blacklistLabels, deletedGiftTitles });
   const userMessage = buildGiftUserMessage(profile);
 
   const fullPrompt = `=== SYSTEM ===\n${systemPrompt}\n\n=== USER ===\n${userMessage}`;

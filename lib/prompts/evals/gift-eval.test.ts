@@ -153,6 +153,7 @@ describe("Evals prompts — issue #21", () => {
     const systemPrompt = buildGiftSystemPrompt({
       alreadySuggestedTitles: [],
       blacklistLabels: profile.blacklist.map((t) => t.label),
+      deletedGiftTitles: [],
     });
     const userMessage = buildGiftUserMessage(profile);
 

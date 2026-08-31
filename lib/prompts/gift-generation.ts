@@ -175,18 +175,26 @@ function contexteXml(profile: UserProfile): string {
 export function buildGiftSystemPrompt(params: {
   alreadySuggestedTitles: string[];
   blacklistLabels: string[];
+  deletedGiftTitles: string[];
 }): string {
   const already = params.alreadySuggestedTitles.map(escapeXml).join(", ");
   const blacklist = params.blacklistLabels.map(escapeXml).join(", ");
+  const deleted = params.deletedGiftTitles.map(escapeXml).join(", ");
 
-  return [
+  const lines = [
     "Tu es GiftGenius, conseiller cadeaux français expert en sérendipité.",
     "Contraintes: réponds en français, JSON via schema uniquement, prix dans fourchette budget (indication souple),",
     `interdit: {${blacklist || "aucun"}} , ne répète pas: {${already || "aucun"}} , 1 max SAVOIR, >=4 archétypes/5, tags_used = 2 labels existants du profil.`,
     'reasoning: 2-3 puces "- {emoji} {bénéfice concret lié au profil}" (pas de phrases longues).',
     "Arch\u00e9types: OBJET DURABLE, EXPERIENCE, CONSOMMABLE, SAVOIR (max 1), SERVICE.",
-    "Croise au moins 2 donn\u00e9es du profil par id\u00e9e. Si EXPERT, propose du mat\u00e9riel de niche.",
-  ].join("\n");
+    "Croise au moins 2 donn\u00e9es du profil par idée. Si EXPERT, propose du matériel de niche.",
+  ];
+
+  if (deleted.length > 0) {
+    lines.splice(2, 0, `Toutes les cartes supprimées: {${deleted}} — ne re-propose aucune de ces idées (ni variantes proches du même type).`);
+  }
+
+  return lines.join("\n");
 }
 
 export function buildGiftUserMessage(

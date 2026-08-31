@@ -126,3 +126,30 @@ export function sanitizeTagLabels(labels: string[], max = 20): string[] {
   }
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Deleted gifts formatting (issue #26)
+// ---------------------------------------------------------------------------
+
+/** Plafond de sécurité — protège le prompt contre un volume pathologique de cartes supprimées. */
+export const DELETED_GIFTS_CEILING = 1000;
+
+/**
+ * Formate une collection de cartes supprimées en entrées `catégorie: titre` pour injection prompt.
+ * Filtre les entrées vides, garde les `max` plus récents (l'ordre d'entrée doit être newest-first).
+ * La collection stockée n'est PAS tronquée — seules les entrées injectées dans le prompt le sont.
+ */
+export function formatDeletedGiftTitles(
+  items: { category: string; title: string }[],
+  max = DELETED_GIFTS_CEILING,
+): string[] {
+  const mapped: string[] = [];
+  for (const item of items) {
+    const cat = item.category?.trim();
+    const title = item.title?.trim();
+    if (!cat || !title) continue;
+    mapped.push(`${cat}: ${title}`);
+    if (mapped.length >= max) break;
+  }
+  return mapped;
+}

@@ -7,6 +7,7 @@ import {
   saveToStorage,
   removeFromStorage,
   dedupeAndLimitTitles,
+  dedupeGiftsById,
   clearGiftGeneratorStorage,
 } from "./storage";
 import { z } from "zod";
@@ -50,10 +51,11 @@ function ensureWindowWithStorage(storage?: Storage) {
 }
 
 describe("STORAGE_KEYS", () => {
-  it("contient les 3 clés attendues", () => {
+  it("contient les clés attendues", () => {
     expect(STORAGE_KEYS.profile).toBe("giftgen:profile");
     expect(STORAGE_KEYS.gifts).toBe("giftgen:gifts");
     expect(STORAGE_KEYS.alreadySuggested).toBe("giftgen:alreadySuggested");
+    expect(STORAGE_KEYS.deletedGifts).toBe("giftgen:deletedGifts");
   });
 });
 
@@ -167,16 +169,18 @@ describe("loadFromStorage / saveToStorage / remove", () => {
     expect(globalThis.window.localStorage.getItem(STORAGE_KEYS.gifts)).toBeNull();
   });
 
-  it("clearGiftGeneratorStorage supprime les 3 clés", () => {
+  it("clearGiftGeneratorStorage supprime les clés giftgen", () => {
     const mem = ensureWindowWithStorage();
     mem.setItem(STORAGE_KEYS.profile, "{}");
     mem.setItem(STORAGE_KEYS.gifts, "[]");
     mem.setItem(STORAGE_KEYS.alreadySuggested, "[]");
+    mem.setItem(STORAGE_KEYS.deletedGifts, "[]");
     mem.setItem("other:key", "keep");
     clearGiftGeneratorStorage();
     expect(mem.getItem(STORAGE_KEYS.profile)).toBeNull();
     expect(mem.getItem(STORAGE_KEYS.gifts)).toBeNull();
     expect(mem.getItem(STORAGE_KEYS.alreadySuggested)).toBeNull();
+    expect(mem.getItem(STORAGE_KEYS.deletedGifts)).toBeNull();
     expect(mem.getItem("other:key")).toBe("keep");
   });
 });
@@ -209,5 +213,21 @@ describe("dedupeAndLimitTitles", () => {
 
   it("gère tableau vide", () => {
     expect(dedupeAndLimitTitles([], 30)).toEqual([]);
+  });
+});
+
+describe("dedupeGiftsById", () => {
+  it("retire les doublons par id", () => {
+    const a = { id: "a", title: "A" };
+    const b = { id: "b", title: "B" };
+    expect(dedupeGiftsById([a, b, a, b, a])).toEqual([a, b]);
+  });
+  it("conserve l'ordre de première apparition", () => {
+    const c = { id: "c" };
+    const d = { id: "d" };
+    expect(dedupeGiftsById([d, c, d])).toEqual([d, c]);
+  });
+  it("gère tableau vide", () => {
+    expect(dedupeGiftsById([])).toEqual([]);
   });
 });
